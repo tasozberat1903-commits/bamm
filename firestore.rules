@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128; }
+
+    // Validation for Interaction
+    function isValidInteraction(data) {
+      return data.fromTable is int && 
+             data.fromTable >= 1 && data.fromTable <= 100 &&
+             (data.toTable == null || (data.toTable is int && data.toTable >= 1 && data.toTable <= 100)) &&
+             data.type in ['shot', 'song', 'cheer'] &&
+             data.timestamp == request.time;
+    }
+
+    // Validation for Spin
+    function isValidSpin(data) {
+      return data.table is int && 
+             data.table >= 1 && data.table <= 100 &&
+             data.result is string && data.result.size() <= 100 &&
+             data.timestamp == request.time;
+    }
+
+    match /interactions/{interactionId} {
+      allow list: if true; // Public feed
+      allow get: if true;
+      allow create: if isValidId(interactionId) && isValidInteraction(incoming());
+      allow update, delete: if false; // Immutable logs
+    }
+
+    match /spins/{spinId} {
+      allow list: if true; // Public feed
+      allow get: if true;
+      allow create: if isValidId(spinId) && isValidSpin(incoming());
+      allow update, delete: if false; // Immutable logs
+    }
+  }
+}

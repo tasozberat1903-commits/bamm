@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "Interaction": {
+      "title": "Interaction",
+      "description": "A record of an interaction between two tables (e.g., buying a shot).",
+      "type": "object",
+      "properties": {
+        "fromTable": { "type": "integer" },
+        "toTable": { "type": "integer" },
+        "type": { "type": "string", "enum": ["shot", "song", "cheer"] },
+        "message": { "type": "string" },
+        "timestamp": { "type": "integer", "format": "timestamp" }
+      },
+      "required": ["fromTable", "type", "timestamp"]
+    },
+    "Spin": {
+      "title": "Spin",
+      "description": "A record of a wheel spin outcome.",
+      "type": "object",
+      "properties": {
+        "table": { "type": "integer" },
+        "result": { "type": "string" },
+        "timestamp": { "type": "integer", "format": "timestamp" }
+      },
+      "required": ["table", "result", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/interactions/{interactionId}": {
+      "schema": "Interaction",
+      "description": "Log of multi-table interactions."
+    },
+    "/spins/{spinId}": {
+      "schema": "Spin",
+      "description": "Log of wheel spin results for the global feed."
+    }
+  }
+}
