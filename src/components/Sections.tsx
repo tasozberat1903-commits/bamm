@@ -1348,7 +1348,7 @@ export function InfoModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md"
+            className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-xl"
           />
 
           {/* Modal Content */}
@@ -1356,108 +1356,123 @@ export function InfoModal({
             initial={{ opacity: 0, scale: 0.9, y: 30 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 30 }}
-            className="fixed inset-0 z-[301] flex items-center justify-center p-6 pointer-events-none"
+            className="fixed inset-0 z-[301] flex items-center justify-center p-4 pointer-events-none"
           >
-            <div className="bg-[#1C1C1E] w-full max-w-sm rounded-[40px] border border-bamm-yellow/30 shadow-[0_32px_64px_rgba(0,0,0,0.8)] relative overflow-y-auto max-h-[90vh] no-scrollbar pointer-events-auto p-6 sm:p-8 flex flex-col items-center">
+            <div className="bg-[#0A0A0C] w-full max-w-sm rounded-[48px] border border-white/5 shadow-[0_40px_100px_rgba(0,0,0,1)] relative overflow-hidden max-h-[95vh] no-scrollbar pointer-events-auto flex flex-col items-center">
+              {/* Background Accents */}
+              <div className="absolute top-0 left-0 w-full h-[180px] bg-gradient-to-b from-[#AD1519]/20 to-transparent pointer-events-none" />
+              <div className="absolute top-[-50px] right-[-50px] w-48 h-48 bg-bamm-yellow/5 rounded-full blur-[80px] pointer-events-none" />
+              <div className="absolute bottom-[-50px] left-[-50px] w-48 h-48 bg-[#AD1519]/10 rounded-full blur-[80px] pointer-events-none" />
+
               {/* Close Button */}
               <button
                 onClick={onClose}
-                className="absolute top-4 right-4 w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-white/40 active:scale-95 transition-all border border-white/5"
+                className="absolute top-6 right-6 w-11 h-11 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-white/60 active:scale-95 transition-all border border-white/5 z-20"
               >
                 <X size={20} />
               </button>
 
-              {/* Logo/Image */}
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-bamm-yellow/20 to-transparent p-1 mb-4 sm:mb-6 mt-2 border border-bamm-yellow/10 shrink-0">
-                <div className="w-full h-full rounded-full bg-bamm-black overflow-hidden border-2 border-bamm-yellow/20 shadow-[0_0_40px_rgba(255,215,0,0.15)]">
-                  <img
-                    src="https://i.hizliresim.com/guz3g2u.jpg"
-                    alt="BAMM"
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
+              {/* Top Section / Logo */}
+              <div className="relative pt-12 pb-8 flex flex-col items-center z-10">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-bamm-yellow/20 via-black to-[#AD1519]/20 p-[1px] mb-6 shadow-2xl">
+                  <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden border border-white/5">
+                    <img
+                      src="https://i.hizliresim.com/guz3g2u.jpg"
+                      alt="BAMM"
+                      className="w-full h-full object-cover scale-110"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                </div>
+
+                <div className="text-center px-4">
+                  <h2 className="text-2xl font-black text-white tracking-widest uppercase italic leading-tight mb-2 drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                    {info.name.split(" & ")[0]}
+                    <span className="text-bamm-yellow"> & </span>
+                    {info.name.split(" & ")[1]}
+                  </h2>
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="h-[1px] w-4 bg-bamm-yellow/40"></div>
+                    <p className="text-bamm-yellow text-[10px] font-black uppercase tracking-[0.4em] mb-0">
+                      {info.tagline}
+                    </p>
+                    <div className="h-[1px] w-4 bg-bamm-yellow/40"></div>
+                  </div>
                 </div>
               </div>
 
-              {/* Header */}
-              <div className="text-center mb-6 sm:mb-8 shrink-0">
-                <h2 className="text-xl sm:text-2xl font-black text-bamm-yellow tracking-tighter uppercase italic leading-tight mb-1 sm:mb-2">
-                  {info.name}
-                </h2>
-                <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">
-                  {info.tagline}
-                </p>
+              {/* Contact Grid */}
+              <div className="w-full px-6 grid grid-cols-3 gap-4 mb-10 z-10">
+                {[
+                  { icon: Instagram, label: "Instagram", href: `https://instagram.com/${info.instagram.replace("@", "")}`, isExternal: true },
+                  { icon: Phone, label: "Telefon", href: `tel:${info.phone}`, isExternal: false },
+                  { icon: MapPin, label: "Yol Tarifi", href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(info.address)}`, isExternal: true },
+                ].map((action, i) => (
+                  <a
+                    key={i}
+                    href={action.href}
+                    target={action.isExternal ? "_blank" : undefined}
+                    rel={action.isExternal ? "noopener noreferrer" : undefined}
+                    className="flex flex-col items-center gap-3 group"
+                  >
+                    <div className="w-14 h-14 bg-[#151517] border border-white/5 rounded-2xl flex items-center justify-center text-bamm-yellow group-hover:bg-bamm-yellow/10 group-hover:border-bamm-yellow/20 group-active:scale-90 transition-all duration-300 shadow-lg">
+                      <action.icon size={22} strokeWidth={1.5} />
+                    </div>
+                    <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">
+                      {action.label}
+                    </span>
+                  </a>
+                ))}
               </div>
 
-              {/* Action Icons */}
-              <div className="flex gap-4 mb-6 sm:mb-10 shrink-0">
-                <a
-                  href={`https://instagram.com/${info.instagram.replace("@", "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-12 h-12 sm:w-14 sm:h-14 bg-white/5 rounded-full flex items-center justify-center text-bamm-yellow border border-white/10 active:scale-90 transition-all hover:bg-bamm-yellow/10 shadow-lg"
-                >
-                  <Instagram size={20} strokeWidth={1.5} />
-                </a>
-                <a
-                  href={`tel:${info.phone}`}
-                  className="w-12 h-12 sm:w-14 sm:h-14 bg-white/5 rounded-full flex items-center justify-center text-bamm-yellow border border-white/10 active:scale-90 transition-all hover:bg-bamm-yellow/10 shadow-lg"
-                >
-                  <Phone size={20} strokeWidth={1.5} />
-                </a>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(info.address)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-12 h-12 sm:w-14 sm:h-14 bg-white/5 rounded-full flex items-center justify-center text-bamm-yellow border border-white/10 active:scale-90 transition-all hover:bg-bamm-yellow/10 shadow-lg"
-                >
-                  <MapPin size={20} strokeWidth={1.5} />
-                </a>
-              </div>
-
-              {/* Simple Details */}
-              <div className="w-full space-y-4 sm:space-y-6 mb-6 sm:mb-10 px-2 shrink-0">
-                <div className="flex items-center justify-center gap-3 text-white/80">
-                  <Clock size={16} className="text-bamm-yellow" />
-                  <span className="text-[12px] font-bold tracking-widest uppercase">
-                    {info.hours}
-                  </span>
+              {/* Details List */}
+              <div className="w-full px-8 space-y-6 mb-12 z-10">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#AD1519]/10 border border-[#AD1519]/20 flex items-center justify-center shrink-0">
+                    <Clock size={16} className="text-[#AD1519]" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Çalışma Saatleri</span>
+                    <span className="text-[13px] font-bold text-white tracking-tight">{info.hours}</span>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center gap-2 text-center">
-                  <div className="flex items-center gap-2 text-white/80">
+
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-bamm-yellow/10 border border-bamm-yellow/20 flex items-center justify-center shrink-0">
                     <MapPin size={16} className="text-bamm-yellow" />
-                    <span className="text-[12px] font-bold tracking-widest uppercase">
-                      {info.address.split(",")[0]}
-                    </span>
                   </div>
-                  <span className="text-[10px] font-medium text-white/30 uppercase tracking-[0.2em]">
-                    {info.address.split(",").slice(1).join(",")}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Adres Bilgisi</span>
+                    <span className="text-[13px] font-bold text-white tracking-tight">{info.address}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Wi-Fi Card */}
-              <div className="w-full bg-white/[0.03] rounded-[24px] sm:rounded-[32px] border border-dashed border-white/10 p-4 sm:p-6 flex flex-col items-center relative overflow-hidden shrink-0 mt-auto">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-bamm-yellow/5 rounded-full blur-3xl pointer-events-none" />
-                <Wifi size={24} className="text-bamm-yellow mb-4" />
-                <div className="space-y-1 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest italic">
-                      Wi-Fi:
-                    </span>
-                    <span className="text-[12px] font-black text-white uppercase tracking-[0.1em]">
-                      {info.wifi.ssid}
-                    </span>
+              {/* Wi-Fi Premium Card */}
+              <div className="w-[calc(100%-48px)] mx-6 mb-8 p-6 bg-gradient-to-br from-white/[0.03] to-transparent rounded-[32px] border border-white/10 relative overflow-hidden z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-bamm-yellow/20 flex items-center justify-center">
+                      <Wifi size={16} className="text-bamm-yellow" />
+                    </div>
+                    <span className="text-[11px] font-black text-white uppercase tracking-widest italic">PREMIUM WI-FI</span>
                   </div>
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest italic">
-                      Pass:
-                    </span>
-                    <span className="text-[12px] font-black text-white uppercase tracking-[0.1em]">
-                      {info.wifi.pass}
-                    </span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em] mb-1">AĞ ADI / SSID</span>
+                    <span className="text-[12px] font-black text-white/90 uppercase tracking-widest truncate">{info.wifi.ssid}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em] mb-1">ŞİFRE / PASSWORD</span>
+                    <span className="text-[12px] font-black text-bamm-yellow tracking-widest truncate">{info.wifi.pass}</span>
                   </div>
                 </div>
+
+                {/* Aesthetic Detail */}
+                <div className="absolute top-0 right-0 w-24 h-24 bg-bamm-yellow/5 rounded-full blur-2xl pointer-events-none" />
               </div>
             </div>
           </motion.div>
