@@ -10,6 +10,9 @@
 }
 
 @layer base {
+  html, body {
+    @apply overflow-x-hidden;
+  }
   body {
     @apply bg-bamm-black text-white antialiased;
     -webkit-tap-highlight-color: transparent;

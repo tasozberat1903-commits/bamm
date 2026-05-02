@@ -41,8 +41,12 @@ import {
   Lock,
   Tag,
   MousePointer2,
+  ListFilter,
+  Menu as MenuIcon,
+  BadgePercent,
+  Calendar,
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { CATEGORIES, MENU_DATA, MenuItem, CAMPAIGNS, EVENTS } from "../data";
 import { db } from "../lib/firebase";
 import {
@@ -69,11 +73,19 @@ export function Header({
     <header
       className={`sticky top-0 z-[100] ${isLight ? "bg-white/80 border-black/5" : "bg-bamm-black/80 border-white/5"} backdrop-blur-md px-6 pt-[calc(1rem+env(safe-area-inset-top))] pb-4 flex items-center justify-between border-b relative transition-colors duration-500`}
     >
-      {/* Spacer to balance the layout */}
-      <div className="w-20 opacity-0 pointer-events-none" />
+      {/* Left Info/Greeting */}
+      <div className="flex flex-col z-10">
+        <span className={`text-[9px] font-black uppercase tracking-[0.2em] mb-0.5 ${isLight ? "text-gray-400" : "text-white/40"}`}>
+          HOŞ GELDİNİZ
+        </span>
+        <div className={`flex items-center gap-1.5 ${isLight ? "text-gray-900" : "text-white"}`}>
+          <MapPin size={12} className={isLight ? "text-black" : "text-bamm-yellow"} strokeWidth={2.5} />
+          <span className="text-[13px] font-bold tracking-tight">BAMM Garden</span>
+        </div>
+      </div>
 
       {/* Centered Logo */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
         <div
           className={`w-14 h-14 ${isLight ? "bg-white" : "bg-bamm-black"} rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,215,0,0.15)] overflow-hidden border ${isLight ? "border-black/5" : "border-white/10"}`}
         >
@@ -235,6 +247,22 @@ export function HomeSection({
   onSocialClick: () => void;
   onSearchClick: () => void;
 }) {
+  const [activeCampaignIndex, setActiveCampaignIndex] = useState(0);
+  const campaignScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleCampaignScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollLeft = e.currentTarget.scrollLeft;
+    const container = e.currentTarget;
+    if (container.children.length > 0) {
+      const firstChild = container.children[0] as HTMLElement;
+      const itemWidth = firstChild.offsetWidth + 16; // 16 is the gap-4
+      const index = Math.round(scrollLeft / itemWidth);
+      if (index !== activeCampaignIndex && index >= 0 && index < CAMPAIGNS.length) {
+        setActiveCampaignIndex(index);
+      }
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -242,72 +270,78 @@ export function HomeSection({
       exit={{ opacity: 0, y: -20 }}
       className="space-y-10 pb-32"
     >
-      {/* Hero Section - Edge to Edge */}
-      <div className="relative h-[550px] overflow-hidden group shadow-2xl bg-black">
-        <img
-          src="https://i.hizliresim.com/p4up7ax.jpg"
-          alt="BAMM Garden"
-          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent pointer-events-none" />
+      {/* Hero Section Container */}
+      <div className="px-5 mt-4">
+        {/* The big image card */}
+        <div className="relative h-[480px] rounded-[32px] overflow-hidden shadow-2xl group">
+          <img
+            src="https://i.hizliresim.com/p4up7ax.jpg"
+            alt="Pizza"
+            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+          />
+          {/* Gradient for text contrast */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+          
+          <div className="absolute inset-0 p-8 flex flex-col justify-end">
+            <div className="mb-auto mt-8">
+              <span className="text-white font-bold tracking-[0.3em] text-[13px] block mb-2 drop-shadow-md">
+                LEZZETİN
+              </span>
+              <h2 className="text-white font-black text-5xl leading-[0.9] drop-shadow-lg mb-1" style={{fontFamily: 'Impact, sans-serif'}}>
+                EN SICAK
+              </h2>
+              <h2 className="text-bamm-yellow font-black text-6xl leading-[0.9] italic drop-shadow-lg transform -rotate-1" style={{fontFamily: 'Impact, sans-serif'}}>
+                HALİ!
+              </h2>
+              <p className="text-gray-300 mt-6 text-[13px] leading-relaxed max-w-[200px] font-medium drop-shadow-md">
+                Taptaze malzemelerle, usta dokunuşlarla hazırlanır.
+              </p>
+              
+              {/* Optional yellow line */}
+              <div className="w-12 h-[2px] bg-bamm-yellow mt-6 opacity-80" />
+            </div>
 
-        {/* Modern Minimalist Tap Icon */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <motion.div
-            onClick={() => onMenuClick()}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="relative cursor-pointer group/tap pointer-events-auto"
-          >
-            {/* Simple Elegant Ripple */}
-            <motion.div
-              className="absolute inset-0 border-2 border-white/30 rounded-full"
-              initial={{ scale: 1, opacity: 0.8 }}
-              animate={{ scale: 2, opacity: 0 }}
-              transition={{
-                repeat: Infinity,
-                duration: 2,
-                ease: "easeOut",
-              }}
-            />
-
-            {/* Clean Glass Button */}
-            <motion.div
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="w-20 h-20 bg-black/60 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/20 shadow-2xl relative z-10"
-            >
-              <MousePointer2
-                size={32}
-                className="text-white drop-shadow-lg transition-transform group-hover/tap:scale-110"
-                strokeWidth={1.5}
-              />
-            </motion.div>
-
-            {/* Subtle Label */}
-            <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
-              <span className="text-white text-[10px] font-bold uppercase tracking-[0.4em] drop-shadow-lg opacity-80">
+            {/* Play Button - Menüye Git */}
+            <div className="flex items-center gap-4 mt-auto relative z-10">
+              <motion.button
+                onClick={() => onMenuClick()}
+                whileTap={{ scale: 0.95 }}
+                className="w-14 h-14 rounded-full bg-gradient-to-br from-black/80 to-black/40 border border-bamm-yellow/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_20px_rgba(255,215,0,0.15)]"
+              >
+                <div className="w-0 h-0 border-t-[7px] border-t-transparent border-l-[11px] border-l-bamm-yellow border-b-[7px] border-b-transparent ml-1" />
+              </motion.button>
+              <span className="text-gray-200 font-bold text-[11px] tracking-[0.2em] uppercase drop-shadow-md">
                 MENÜYE GİT
               </span>
             </div>
-          </motion.div>
+          </div>
+          
+          {/* Carousel dots */}
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-bamm-yellow" />
+            <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+            <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+          </div>
         </div>
 
-        <div className="absolute bottom-10 left-0 px-8 w-full">
-          <div className="flex items-center gap-4 p-5 bg-black/40 backdrop-blur-2xl rounded-[32px] border border-white/10 shadow-2xl">
-            <button
-              onClick={() => onMenuClick()}
-              className="flex-1 bg-gradient-to-b from-bamm-yellow to-[#FACC15] text-bamm-black font-black py-4 rounded-2xl text-[11px] uppercase shadow-xl active:scale-[0.95] transition-all tracking-[0.2em]"
-            >
-              MENÜYÜ GÖR
-            </button>
-            <button
-              className="flex-1 bg-white/10 border border-white/20 text-white font-bold py-4 rounded-2xl text-[11px] uppercase active:scale-[0.95] transition-all tracking-[0.2em]"
-              onClick={onSocialClick}
-            >
-              REZERVASYON
-            </button>
-          </div>
+        {/* Buttons Below Card */}
+        <div className="flex items-center gap-3 mt-4">
+          <button
+             onClick={() => onMenuClick()}
+             className="flex-1 bg-gradient-to-r from-bamm-yellow to-[#FACC15] text-black font-black py-4 px-2 rounded-[20px] flex items-center justify-center gap-2 shadow-[0_8px_16px_rgba(250,204,21,0.2)] active:scale-[0.98] transition-transform"
+          >
+            <MenuIcon size={18} strokeWidth={2.5} className="text-black" />
+            <span className="text-[12px] tracking-[0.15em] uppercase">MENÜYÜ GÖR</span>
+          </button>
+          
+          <button
+            onClick={onSocialClick}
+             className="flex-1 bg-[#1C1D21] border border-white/5 text-white font-bold py-4 px-2 rounded-[20px] flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-transform"
+          >
+            <Calendar size={18} strokeWidth={2} className="text-bamm-yellow" />
+            <span className="text-[12px] tracking-[0.15em] uppercase text-gray-100">REZERVASYON</span>
+          </button>
         </div>
       </div>
 
@@ -324,68 +358,67 @@ export function HomeSection({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 grid-rows-2 gap-3 h-[420px]">
-          {/* Featured Large Card */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            onClick={() => onMenuClick(CAMPAIGNS[0].category)}
-            className="row-span-2 relative rounded-[32px] overflow-hidden group border border-white/5 shadow-2xl cursor-pointer active:scale-[0.98] transition-transform"
+        <div className="relative">
+          <div 
+            ref={campaignScrollRef}
+            onScroll={handleCampaignScroll}
+            className="flex gap-4 overflow-x-auto no-scrollbar pb-8 -mx-6 px-6"
           >
-            <img
-              src={CAMPAIGNS[0].image}
-              alt={CAMPAIGNS[0].title}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-bamm-black via-bamm-black/20 to-transparent" />
-            <div className="absolute inset-0 p-6 flex flex-col justify-end">
-              <div className="bg-white/10 backdrop-blur-md w-fit px-2 py-0.5 rounded-sm mb-3 border border-white/10">
-                <span className="text-[7px] font-black text-white uppercase tracking-widest">
-                  ÖNE ÇIKAN
-                </span>
-              </div>
-              <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter leading-[0.85] mb-3">
-                {CAMPAIGNS[0].title}
-              </h3>
-              <p className="text-gray-300 text-[10px] font-medium uppercase tracking-wider leading-relaxed opacity-80 mb-4 line-clamp-3">
-                {CAMPAIGNS[0].description}
-              </p>
-              <div className="w-fit flex items-center gap-1.5 bg-bamm-yellow text-bamm-black px-4 py-2 rounded-full text-[8px] font-black uppercase tracking-widest shadow-lg">
-                İNCELE <ChevronRight size={12} />
-              </div>
-            </div>
-          </motion.div>
+            {CAMPAIGNS.map((campaign, i) => (
+              <motion.div
+                key={campaign.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 * i }}
+                onClick={() => onMenuClick(campaign.category)}
+                className="min-w-[85vw] sm:min-w-[320px] h-[340px] relative rounded-[32px] overflow-hidden group border border-white/5 shadow-2xl cursor-pointer active:scale-[0.98] transition-transform shrink-0"
+              >
+                <img
+                  src={campaign.image}
+                  alt={campaign.title}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                <div className="absolute inset-0 p-6 flex flex-col justify-end">
+                  {i === 0 && (
+                    <div className="bg-white/10 backdrop-blur-md w-fit px-2.5 py-1 rounded-md mb-4 border border-white/10 shrink-0">
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">
+                        ÖNE ÇIKAN
+                      </span>
+                    </div>
+                  )}
+                  <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter leading-[0.85] mb-3 drop-shadow-md">
+                    {campaign.title}
+                  </h3>
+                  <p className="text-gray-200 text-[11px] font-medium uppercase tracking-wider leading-relaxed opacity-90 mb-5 line-clamp-2 drop-shadow-md">
+                    {campaign.description}
+                  </p>
+                  <div className="mt-auto w-fit flex items-center gap-2 bg-bamm-yellow text-bamm-black px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
+                    DETAYLI İNCELE <ChevronRight size={14} strokeWidth={2.5} />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
 
-          {/* Smaller Cards */}
-          {CAMPAIGNS.slice(1).map((campaign, i) => (
-            <motion.div
-              key={campaign.id}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 * (i + 1) }}
-              onClick={() => onMenuClick(campaign.category)}
-              className="relative rounded-[32px] overflow-hidden group border border-white/5 shadow-xl cursor-pointer active:scale-[0.98] transition-transform"
-            >
-              <img
-                src={campaign.image}
-                alt={campaign.title}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                referrerPolicy="no-referrer"
+          {/* Scroll Indicators (Dots) */}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 pointer-events-none">
+            {CAMPAIGNS.map((_, i) => (
+              <div
+                key={i}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  activeCampaignIndex === i 
+                    ? "w-4 bg-bamm-yellow shadow-[0_0_8px_rgba(250,204,21,0.5)]" 
+                    : "w-1.5 bg-white/30"
+                }`}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-bamm-black/90 via-bamm-black/40 to-transparent" />
-              <div className="absolute inset-0 p-5 flex flex-col justify-end">
-                <h3 className="text-xs font-black text-white italic uppercase tracking-widest leading-none mb-1">
-                  {campaign.title}
-                </h3>
-                <div className="w-4 h-0.5 bg-bamm-yellow rounded-full transition-all duration-300 group-hover:w-8" />
-              </div>
-            </motion.div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 px-6 md:px-8">
         <div className="flex items-center justify-between px-2">
           <h2 className="text-lg font-bold italic uppercase tracking-tight">
             Kategoriler
@@ -471,7 +504,7 @@ export function HomeSection({
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 px-6 md:px-8">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold italic uppercase tracking-tight">
             Popüler Lezzetler
@@ -547,7 +580,7 @@ export function HomeSection({
       </div>
 
       {/* Social Media Footer */}
-      <div className="pt-10 pb-8 mt-4 mx-[-24px] px-6 flex flex-col items-center justify-center border-t border-black/[0.04]">
+      <div className="pt-10 pb-8 mt-4 flex flex-col items-center justify-center border-t border-black/[0.04]">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-[1px] bg-black/10"></div>
           <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">
@@ -667,11 +700,24 @@ const CATEGORY_ICONS: Record<string, any> = {
   Yemekler: UtensilsCrossed,
   Tatlılar: Cookie,
   Kokteyller: Wine,
-  Kampanyalar: Tag,
+  Kampanyalar: BadgePercent,
   Biralar: Beer,
   "Sıcak İçecekler": Coffee,
   "Soğuk İçecekler": CupSoda,
 };
+
+const CATEGORY_DESCS: Record<string, string> = {
+  Popüler: "En sevilen favoriler",
+  Kampanyalar: "Özel fırsatlar ve avantajlar",
+  Yemekler: "Lezzetli yemek seçenekleri",
+  Kadeh: "Kadeh şarap ve içecekler",
+  Şişeler: "Premium şişe içecekler",
+  Şarap: "Kırmızı, beyaz ve roze şaraplar",
+  Kahvaltı: "Güne güzel başla",
+  Kokteyller: "İmza ve klasik lezzetler",
+  Biralar: "Fıçı ve şişe biralar",
+};
+const getCategoryDescription = (cat: string) => CATEGORY_DESCS[cat] || "Bamm Garden Lezzetleri";
 
 const CATEGORY_LABELS: Record<string, string> = {
   Popüler: "POPÜLER",
@@ -762,7 +808,7 @@ export function MenuSection({
         : item.category === selectedCategory;
 
     let matchesSubcategory = true;
-    if ((selectedCategory === "Kokteyller" || selectedCategory === "Biralar" || selectedCategory === "Kampanyalar" || selectedCategory === "Yemekler" || selectedCategory === "Kahvaltı") && selectedSubcategory !== "Tümü") {
+    if ((selectedCategory === "Kokteyller" || selectedCategory === "Biralar" || selectedCategory === "Kampanyalar" || selectedCategory === "Yemekler" || selectedCategory === "Kahvaltı" || selectedCategory === "Kadeh" || selectedCategory === "Şişeler" || selectedCategory === "Şarap") && selectedSubcategory !== "Tümü") {
       matchesSubcategory = item.subcategory === selectedSubcategory;
     }
 
@@ -777,18 +823,13 @@ export function MenuSection({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="bg-white min-h-screen flex flex-col"
+      className="bg-white min-h-screen flex flex-col pt-[env(safe-area-inset-top)]"
     >
       {/* White Top Header Area */}
-      <div className="bg-white pt-6 pb-8">
+      <div className="bg-white pt-4 pb-8">
         <div className="px-6 flex items-center justify-between mb-8">
-          <button className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full">
-            <div className="grid grid-cols-2 gap-1.5">
-              <div className="w-1.5 h-1.5 bg-gray-900 rounded-sm" />
-              <div className="w-1.5 h-1.5 bg-gray-900 rounded-sm" />
-              <div className="w-1.5 h-1.5 bg-gray-900 rounded-sm" />
-              <div className="w-1.5 h-1.5 bg-gray-900 rounded-sm" />
-            </div>
+          <button className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full border border-gray-100 shadow-sm">
+            <MenuIcon size={20} strokeWidth={2} />
           </button>
 
           <div className="flex flex-col items-center justify-center">
@@ -799,63 +840,82 @@ export function MenuSection({
 
           <button
             onClick={onSearchClick}
-            className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full"
+            className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full border border-gray-100 shadow-sm"
           >
-            <Search size={20} strokeWidth={2.5} />
+            <Search size={20} strokeWidth={2} />
           </button>
         </div>
 
         {/* Campaign / Happy Hour Banner */}
-        <div className="px-6 mb-6">
+        <div className="px-4 mb-8 mt-2">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative h-[72px] rounded-2xl overflow-hidden flex items-center shadow-[0_8px_16px_rgba(0,0,0,0.08)] cursor-pointer active:scale-[0.98] transition-transform"
+            className="relative h-[220px] rounded-[24px] overflow-hidden flex flex-col justify-center shadow-[0_12px_32px_rgba(0,0,0,0.15)] cursor-pointer active:scale-[0.98] transition-all"
           >
             <img
               src="https://i.hizliresim.com/cvn2hrd.png"
               alt="Happy Hour"
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover object-center"
               referrerPolicy="no-referrer"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-bamm-black/90 via-bamm-black/70 to-black/20" />
-            <div className="relative z-10 px-4 flex items-center gap-3 w-full">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-bamm-yellow to-[#EAB308] flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(255,215,0,0.3)]">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0B101A]/95 via-[#0B101A]/80 to-transparent" />
+            
+            {/* Dot Pattern Overlay */}
+            <div className="absolute bottom-0 left-0 w-32 h-32 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '12px 12px' }} />
+            
+            <div className="relative z-10 px-6 sm:px-8 w-[90%] sm:w-2/3">
+              <div className="relative inline-block mb-3">
+                {/* Decorative sparks */}
+                <div className="absolute -top-3 -right-2 flex gap-1.5">
+                  <div className="w-1 h-3 bg-bamm-yellow rounded-full -rotate-[25deg] translate-y-1" />
+                  <div className="w-1 h-3.5 bg-bamm-yellow rounded-full rotate-12 -translate-y-1" />
+                  <div className="w-1 h-3 bg-bamm-yellow rounded-full rotate-[45deg] translate-y-2" />
+                </div>
+                
+                <h2 
+                  className="text-bamm-yellow text-[38px] sm:text-[46px] font-black leading-[0.85] tracking-tight uppercase" 
+                  style={{ transform: 'scaleY(1.2)', transformOrigin: 'bottom left', fontFamily: 'Impact, sans-serif' }}
+                >
+                  HAPPY HOUR
+                </h2>
+              </div>
+              
+              <div className="flex items-center gap-2 mb-4 mt-2">
                 <Clock
-                  size={16}
-                  className="text-bamm-black"
+                  size={20}
+                  className="text-bamm-yellow"
                   strokeWidth={2.5}
                 />
+                <span className="text-white text-[15px] font-bold tracking-widest">
+                  17:00 - 19:00
+                </span>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <h3 className="text-bamm-yellow text-[9px] font-black uppercase tracking-[0.2em]">
-                    HAPPY HOUR
-                  </h3>
-                  <div className="w-1 h-1 rounded-full bg-white/30" />
-                  <span className="text-white text-[9px] font-bold tracking-widest">
-                    17:00 - 19:00
-                  </span>
-                </div>
-                <p className="text-white text-xs font-bold leading-tight tracking-tight">
-                  Tüm kokteyllerde{" "}
-                  <span className="text-bamm-yellow italic">%20 İNDİRİM!</span>
-                </p>
+              
+              <div className="w-48 h-[1px] bg-gradient-to-r from-bamm-yellow to-transparent mb-4 opacity-60" />
+              
+              <div className="flex flex-col">
+                <span className="text-white text-sm sm:text-[15px] font-normal tracking-wide mb-1">
+                  Tüm kokteyllerde
+                </span>
+                <span 
+                  className="text-bamm-yellow text-[26px] sm:text-[34px] font-black italic tracking-tighter leading-none uppercase" 
+                  style={{ transform: 'scaleY(1.1)', transformOrigin: 'bottom left', fontFamily: 'Impact, sans-serif' }}
+                >
+                  %20 İNDİRİM!
+                </span>
               </div>
-              <ChevronRight size={16} className="text-white/40 shrink-0" />
             </div>
           </motion.div>
         </div>
 
         <div className="px-6 flex items-start gap-4">
-          {onBackClick && (
-            <button
-              onClick={onBackClick}
-              className="mt-2 w-10 h-10 bg-black/5 rounded-full flex items-center justify-center text-black/60 hover:bg-black/10 transition-colors"
-            >
-              <ArrowLeft size={20} />
-            </button>
-          )}
+          <div className="w-[52px] h-[52px] bg-[#FFF8D6] rounded-full flex items-center justify-center text-[#0F172A] shrink-0 mt-1">
+            {(() => {
+              const TitleIcon = CATEGORY_ICONS[selectedCategory] || Utensils;
+              return <TitleIcon size={26} strokeWidth={2.5} />;
+            })()}
+          </div>
           <div>
             <h1 className="text-[40px] leading-none font-black text-gray-900 tracking-tight mb-2">
               {selectedCategory === "Popüler" ? "Favoriler" : selectedCategory}
@@ -869,8 +929,8 @@ export function MenuSection({
         </div>
       </div>
 
-      {/* Yellow Body Area */}
-      <div className="bg-bamm-yellow rounded-t-[40px] pt-6 flex-1 flex flex-col relative shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
+      {/* Category Navigation Area */}
+      <div className="bg-white rounded-t-[40px] pt-6 flex-1 flex flex-col relative shadow-[0_-10px_20px_rgba(0,0,0,0.02)] border-t border-gray-100">
         <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0">
           {dynamicCategories.map((cat) => {
             const isActive = selectedCategory === cat;
@@ -881,33 +941,48 @@ export function MenuSection({
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className="flex flex-col items-center justify-end h-[116px] min-w-[84px] transition-all group"
+                className={`relative flex flex-col items-center justify-start min-w-[100px] w-[100px] pt-4 pb-4 px-2 rounded-[24px] transition-all duration-300 ${
+                  isActive
+                    ? "bg-[#FFF9E5] border border-bamm-yellow shadow-sm"
+                    : "bg-white border border-gray-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                }`}
               >
                 <div
-                  className={`relative rounded-full flex items-center justify-center transition-all duration-300 ${
+                  className={`relative rounded-full flex items-center justify-center transition-all duration-300 mb-2 ${
                     isActive
-                      ? "w-[80px] h-[80px] bg-black text-white shadow-2xl mb-3"
-                      : "w-[64px] h-[64px] bg-white/40 text-black group-hover:bg-white/60 mb-3"
+                      ? "w-14 h-14 bg-bamm-yellow text-black"
+                      : "w-14 h-14 bg-[#F4F4F5] text-gray-400 group-hover:bg-[#E4E4E7] group-hover:text-gray-900"
                   }`}
                 >
                   <Icon
-                    size={isActive ? 28 : 22}
-                    strokeWidth={isActive ? 2.5 : 1.5}
+                    size={24}
+                    strokeWidth={1.5}
                   />
-                  {itemCount > 0 && (
-                    <div className={`absolute -top-1 -right-1 flex items-center justify-center rounded-full text-[10px] font-bold shadow-sm ${isActive ? 'bg-bamm-yellow text-black min-w-[20px] h-[20px] px-1' : 'bg-black text-white min-w-[18px] h-[18px] px-1'}`}>
-                      {itemCount}
-                    </div>
-                  )}
                 </div>
+                
+                {itemCount > 0 && (
+                  <div className={`absolute top-2 right-2 flex items-center justify-center rounded-full text-[10px] font-bold shadow-sm border-2 border-white min-w-[24px] h-[24px] px-1 ${
+                    isActive ? 'bg-black text-white' : 'bg-gray-200 text-gray-700'
+                  }`}>
+                    {itemCount}
+                  </div>
+                )}
+                
                 <span
-                  className={`text-[10px] font-black uppercase tracking-[0.15em] text-center transition-all duration-300 ${
-                    isActive ? "text-black" : "text-black/60"
+                  className={`text-[11px] font-black uppercase tracking-wide text-center transition-all duration-300 mb-0.5 ${
+                    isActive ? "text-gray-900" : "text-gray-600"
                   }`}
-                  style={{ wordBreak: 'break-word', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
                 >
                   {CATEGORY_LABELS[cat] || cat.toUpperCase()}
                 </span>
+                
+                <span className="text-[9px] font-medium text-gray-400 text-center leading-[1.2] px-1">
+                  {getCategoryDescription(cat)}
+                </span>
+              
+                {isActive && (
+                  <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-8 h-1 bg-bamm-yellow rounded-full" />
+                )}
               </button>
             );
           })}
@@ -919,12 +994,13 @@ export function MenuSection({
               <button
                 key={subcat}
                 onClick={() => setSelectedSubcategory(subcat)}
-                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
                   selectedSubcategory === subcat
-                    ? "bg-black text-white"
-                    : "bg-black/5 text-black/60 hover:bg-black/10"
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                 }`}
               >
+                {subcat === "Tümü" && <ListFilter size={16} />}
                 {subcat}
               </button>
             ))}
@@ -937,12 +1013,13 @@ export function MenuSection({
               <button
                 key={subcat}
                 onClick={() => setSelectedSubcategory(subcat)}
-                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
                   selectedSubcategory === subcat
-                    ? "bg-black text-white"
-                    : "bg-black/5 text-black/60 hover:bg-black/10"
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                 }`}
               >
+                {subcat === "Tümü" && <ListFilter size={16} />}
                 {subcat}
               </button>
             ))}
@@ -955,12 +1032,13 @@ export function MenuSection({
               <button
                 key={subcat}
                 onClick={() => setSelectedSubcategory(subcat)}
-                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
                   selectedSubcategory === subcat
-                    ? "bg-black text-white"
-                    : "bg-black/5 text-black/60 hover:bg-black/10"
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                 }`}
               >
+                {subcat === "Tümü" && <ListFilter size={16} />}
                 {subcat}
               </button>
             ))}
@@ -973,12 +1051,13 @@ export function MenuSection({
               <button
                 key={subcat}
                 onClick={() => setSelectedSubcategory(subcat)}
-                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
                   selectedSubcategory === subcat
-                    ? "bg-black text-white"
-                    : "bg-black/5 text-black/60 hover:bg-black/10"
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                 }`}
               >
+                {subcat === "Tümü" && <ListFilter size={16} />}
                 {subcat}
               </button>
             ))}
@@ -991,12 +1070,70 @@ export function MenuSection({
               <button
                 key={subcat}
                 onClick={() => setSelectedSubcategory(subcat)}
-                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
                   selectedSubcategory === subcat
-                    ? "bg-black text-white"
-                    : "bg-black/5 text-black/60 hover:bg-black/10"
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                 }`}
               >
+                {subcat === "Tümü" && <ListFilter size={16} />}
+                {subcat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {selectedCategory === "Kadeh" && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
+            {["Tümü", "Vodka", "Gin", "Rakı", "Viski"].map((subcat) => (
+              <button
+                key={subcat}
+                onClick={() => setSelectedSubcategory(subcat)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
+                  selectedSubcategory === subcat
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {subcat === "Tümü" && <ListFilter size={16} />}
+                {subcat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {selectedCategory === "Şişeler" && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
+            {["Tümü", "Vodka", "Gin", "Tekila", "Rakı", "Şarap", "Viski"].map((subcat) => (
+              <button
+                key={subcat}
+                onClick={() => setSelectedSubcategory(subcat)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
+                  selectedSubcategory === subcat
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {subcat === "Tümü" && <ListFilter size={16} />}
+                {subcat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {selectedCategory === "Şarap" && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
+            {["Tümü", "Kadeh", "Şişeler"].map((subcat) => (
+              <button
+                key={subcat}
+                onClick={() => setSelectedSubcategory(subcat)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
+                  selectedSubcategory === subcat
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {subcat === "Tümü" && <ListFilter size={16} />}
                 {subcat}
               </button>
             ))}

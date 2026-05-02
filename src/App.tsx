@@ -84,7 +84,7 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen ${activeTab === "menu" ? "bg-white" : activeTab === "contact" ? "bg-[#F5F5F3]" : "bg-bamm-black"} flex flex-col max-w-lg mx-auto relative shadow-2xl transition-colors duration-500`}
+      className={`min-h-screen ${activeTab === "menu" ? "bg-white" : activeTab === "contact" ? "bg-[#F5F5F3]" : "bg-bamm-black"} flex flex-col max-w-lg mx-auto relative shadow-2xl transition-colors duration-500 overflow-x-hidden`}
     >
       <AnimatePresence>
         {isLoading ? (
@@ -125,13 +125,15 @@ export default function App() {
         ) : (
           <>
             <main className="flex-1 overflow-y-auto no-scrollbar relative">
-              <Header
-                isLight={["contact", "menu"].includes(activeTab)}
-                onSearchClick={() => setIsSearchOpen(true)}
-                onAdminClick={activeTab !== "admin" ? () => setActiveTab("admin") : undefined}
-              />
+              {activeTab !== "menu" && (
+                <Header
+                  isLight={["contact", "menu"].includes(activeTab)}
+                  onSearchClick={() => setIsSearchOpen(true)}
+                  onAdminClick={activeTab !== "admin" ? () => setActiveTab("admin") : undefined}
+                />
+              )}
 
-              <div className="pt-4">
+              <div className="pt-2">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeTab}

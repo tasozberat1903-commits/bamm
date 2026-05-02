@@ -283,6 +283,9 @@ export function AdminPanel() {
                       else if (val === "Kampanyalar") defaultSubcategory = "1+1";
                       else if (val === "Yemekler") defaultSubcategory = "Beyaz Etler";
                       else if (val === "Kahvaltı") defaultSubcategory = "Breakfast";
+                      else if (val === "Kadeh") defaultSubcategory = "Vodka";
+                      else if (val === "Şişeler") defaultSubcategory = "Vodka";
+                      else if (val === "Şarap") defaultSubcategory = "Kadeh";
 
                       setEditForm({
                         ...editForm,
@@ -348,6 +351,60 @@ export function AdminPanel() {
                     <option value="Şarap" className="text-black">Şarap</option>
                     <option value="Shoot" className="text-black">Shoot</option>
                     <option value="Fıçı Kampanya" className="text-black">Fıçı Kampanya</option>
+                  </select>
+                </div>
+              )}
+
+              {editForm.category === "Kadeh" && (
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
+                  <select
+                    value={editForm.subcategory || "Vodka"}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, subcategory: e.target.value })
+                    }
+                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
+                  >
+                    <option value="Vodka" className="text-black">Vodka</option>
+                    <option value="Gin" className="text-black">Gin</option>
+                    <option value="Rakı" className="text-black">Rakı</option>
+                    <option value="Viski" className="text-black">Viski</option>
+                  </select>
+                </div>
+              )}
+
+              {editForm.category === "Şişeler" && (
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
+                  <select
+                    value={editForm.subcategory || "Vodka"}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, subcategory: e.target.value })
+                    }
+                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
+                  >
+                    <option value="Vodka" className="text-black">Vodka</option>
+                    <option value="Gin" className="text-black">Gin</option>
+                    <option value="Tekila" className="text-black">Tekila</option>
+                    <option value="Rakı" className="text-black">Rakı</option>
+                    <option value="Şarap" className="text-black">Şarap</option>
+                    <option value="Viski" className="text-black">Viski</option>
+                  </select>
+                </div>
+              )}
+
+              {editForm.category === "Şarap" && (
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
+                  <select
+                    value={editForm.subcategory || "Kadeh"}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, subcategory: e.target.value })
+                    }
+                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
+                  >
+                    <option value="Kadeh" className="text-black">Kadeh</option>
+                    <option value="Şişeler" className="text-black">Şişeler</option>
                   </select>
                 </div>
               )}
