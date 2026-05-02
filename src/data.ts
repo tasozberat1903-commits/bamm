@@ -1852,7 +1852,7 @@ export const CAMPAIGNS: Campaign[] = [
     id: "c2",
     title: "Fıçı Bira Kampanyası",
     description: "2 adet 50cl fıçı bira alana patates tava hediye!",
-    image: "https://images.unsplash.com/photo-1541173155373-ba2290022886?auto=format&fit=crop&q=80&w=800",
+    image: "https://i.hizliresim.com/6tblcx9.png",
     category: "Biralar"
   },
   {
