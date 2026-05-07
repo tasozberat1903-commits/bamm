@@ -28,17 +28,27 @@ export interface Event {
   image?: string;
 }
 
+export interface HeroSlide {
+  id: string;
+  title: string;
+  subtitle: string;
+  highlight: string;
+  description: string;
+  image: string;
+  buttonText: string;
+}
+
 export const CATEGORIES = [
-  "Kampanyalar", "Yemekler", "Kadeh", "Şişeler", "Şarap", "Kokteyller", "Biralar", "Ana Yemekler", "Popüler", "Kahvaltı", "Atıştırmalıklar", "Tost & Sandviç", "Dürümler & Bowl", "Burgerler", "Pizzalar", "Makarnalar", "Salatalar", "Tatlılar", "Sıcak İçecekler", "Soğuk İçecekler"
+  "Kampanyalar", "Yemekler", "Kadeh", "Şişeler", "Şarap", "Kokteyller", "Biralar", "Ana Yemekler", "Popüler", "Kahvaltı", "Kahveler", "Çaylar", "Bitki Çayları", "Atıştırmalıklar", "Tost & Sandviç", "Dürümler & Bowl", "Burgerler", "Pizzalar", "Makarnalar", "Salatalar", "Tatlılar", "Sıcak İçecekler", "Soğuk İçecekler"
 ];
 
 export const MENU_DATA: MenuItem[] = [
-  // --- POPÜLER ---
+  // --- POPÜLER SEÇİMLER (isPopular: true olanlar otomatik olarak Popüler Lezzetler kısmına gelir) ---
   {
     id: "p1",
     name: "BAMM Burger",
-    description: "160gr dana köfte, karamelize soğan, cheddar peyniri, turşu, yeşillik ve patates kızartması ile.",
-    price: "420 TL",
+    description: "160gr dana köfte, karamelize soğan, cheddar peyniri, turşu, özel sos ve patates kızartması ile.",
+    price: "420₺",
     category: "Burgerler",
     image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&q=80&w=800",
     isPopular: true,
@@ -47,28 +57,11 @@ export const MENU_DATA: MenuItem[] = [
     id: "p2",
     name: "PİNK TO BAMM",
     description: "BAMM'ın imza pembe kokteyli; votka, taze meyve özleri ve gizli dokunuşlar.",
-    price: "460 TL",
-    category: "Kokteyller", subcategory: "İmza Kokteylleri",
+    price: "460₺",
+    category: "Kokteyller", 
+    subcategory: "İmza Kokteylleri",
     isPopular: true,
   },
-  {
-    id: "p3",
-    name: "BAMM Combo Tabağı",
-    description: "Sosis, mozzarella sticks, soğan halkası, çıtır tavuk, sigara böreği ve patates kızartması.",
-    price: "390 TL",
-    category: "Atıştırmalıklar",
-    isPopular: true,
-  },
-  {
-    id: "p4",
-    name: "Turkish Breakfast (Serpme)",
-    description: "Zengin peynir çeşitleri, zeytinler, ev yapımı reçeller, sucuklu yumurta, sınırsız çay ile (Kişi başı).",
-    price: "480 TL",
-    category: "Kahvaltı",
-    image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&q=80&w=800",
-    isPopular: true,
-  },
-
   // --- KAHVALTI ---
   {
     id: "kv_br1",
@@ -127,6 +120,15 @@ export const MENU_DATA: MenuItem[] = [
     price: "350₺",
     category: "Kahvaltı",
     subcategory: "Breakfast",
+  },
+  {
+    id: "p4",
+    name: "Turkish Breakfast (Serpme)",
+    description: "Zengin peynir çeşitleri, zeytinler, ev yapımı reçeller, sucuklu yumurta, sınırsız çay ile (Kişi başı).",
+    price: "480₺",
+    category: "Kahvaltı",
+    image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&q=80&w=800",
+    isPopular: true,
   },
   {
     id: "kv_br8",
@@ -312,9 +314,10 @@ export const MENU_DATA: MenuItem[] = [
   {
     id: "a7",
     name: "LEZZET SEPETİ",
-    description: "Çıtır tavuk parçaları, soğan halkası, misket köfte, sigara böreği, sosis, mozarella stick...",
+    description: "Çıtır tavuk parçaları, soğan halkası, misket köfte, sigara böreği, sosis, mozarella stick ve özel soslar.",
     price: "480₺",
     category: "Atıştırmalıklar",
+    isPopular: true,
   },
   {
     id: "a8",
@@ -402,8 +405,9 @@ export const MENU_DATA: MenuItem[] = [
     price: "360 TL",
     category: "Dürümler & Bowl",
     image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800",
+    isPopular: true,
   },
-
+  
   // --- BURGERLER ---
   {
     id: "b1",
@@ -458,6 +462,7 @@ export const MENU_DATA: MenuItem[] = [
     image: "https://images.unsplash.com/photo-1622973536968-3ead9e780960?auto=format&fit=crop&q=80&w=800",
   },
 
+
   // --- SALATALAR ---
   {
     id: "s1",
@@ -474,6 +479,7 @@ export const MENU_DATA: MenuItem[] = [
     price: "420₺",
     category: "Salatalar",
     image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800",
+    isPopular: true,
   },
   {
     id: "s3",
@@ -544,9 +550,10 @@ export const MENU_DATA: MenuItem[] = [
     id: "t1",
     name: "San Sebastian Cheesecake",
     description: "Çikolata sos eşliğinde akışkan İspanyol cheesekake.",
-    price: "260 TL",
+    price: "260₺",
     category: "Tatlılar",
     image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&q=80&w=800",
+    isPopular: true,
   },
   {
     id: "t2",
@@ -1164,6 +1171,7 @@ export const MENU_DATA: MenuItem[] = [
     category: "Yemekler",
     subcategory: "Beyaz Etler",
     image: "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&q=80&w=800",
+    isPopular: true,
   },
   {
     id: "yem_be2",
@@ -1286,10 +1294,11 @@ export const MENU_DATA: MenuItem[] = [
   {
     id: "yem_ke5",
     name: "ÇÖKERTME KEBABI",
-    description: "Kibrit patates üzerinde marine edilmiş et dilimleri, yoğurt ve özel domates sosu ile",
+    description: "Kibrit patates üzerinde marine edilmiş et dilimleri, yoğurt and özel domates sosu ile",
     price: "590₺",
     category: "Yemekler",
     subcategory: "Kırmızı Etler",
+    isPopular: true,
   },
 
   // --- YEMEKLER - Burgerler ---
@@ -1438,7 +1447,7 @@ export const MENU_DATA: MenuItem[] = [
     price: "340₺",
     category: "Yemekler",
     subcategory: "Pizzalar",
-    image: "https://images.unsplash.com/photo-1574071318508-1cdbad80ad50?auto=format&fit=crop&q=80&w=800",
+    image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&q=80&w=800",
   },
   {
     id: "yem_pi6",
@@ -1451,7 +1460,7 @@ export const MENU_DATA: MenuItem[] = [
   {
     id: "yem_pi7",
     name: "Bamm Special Pizza",
-    description: "Şefin özel pizza sosu, mozarella ve zengin garnitürler ile",
+    description: "Şefin özel pizza sosu, mozarella and zengin garnitürler ile",
     price: "470₺",
     category: "Yemekler",
     subcategory: "Pizzalar",
@@ -1459,13 +1468,11 @@ export const MENU_DATA: MenuItem[] = [
   {
     id: "yem_pi8",
     name: "Vejeteryan Pizza",
-    description: "Mantar, biber, mısır, zeytin, mozarella ve domates sos ile",
+    description: "Mantar, biber, mısır, zeytin, mozarella and domates sos ile",
     price: "350₺",
     category: "Yemekler",
     subcategory: "Pizzalar",
   },
-
-  // --- YEMEKLER - Wrapler ---
   {
     id: "yem_wr1",
     name: "SOYA SOSLU TAVUK WRAP",
@@ -1838,22 +1845,165 @@ export const MENU_DATA: MenuItem[] = [
     category: "Şişeler",
     subcategory: "Viski",
   },
+  // --- KAHVELER ---
+  {
+    id: "khv_1",
+    name: "Türk Kahvesi",
+    description: "",
+    price: "90₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_2",
+    name: "Double Espresso",
+    description: "",
+    price: "120₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_3",
+    name: "Damla Sakızlı Türk Kahvesi",
+    description: "",
+    price: "95₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_4",
+    name: "Machiato",
+    description: "",
+    price: "135₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_5",
+    name: "Americano",
+    description: "",
+    price: "125₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_6",
+    name: "Coffe Latte",
+    description: "",
+    price: "135₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_7",
+    name: "Coffe Mocha",
+    description: "",
+    price: "135₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_8",
+    name: "Coffe White Mocha",
+    description: "",
+    price: "135₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_9",
+    name: "Flat White",
+    description: "",
+    price: "135₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_10",
+    name: "Double Türk Kahvesi",
+    description: "",
+    price: "125₺",
+    category: "Kahveler",
+  },
+  {
+    id: "khv_11",
+    name: "Cappuccino",
+    description: "",
+    price: "135₺",
+    category: "Kahveler",
+  },
+  // --- ÇAYLAR ---
+  {
+    id: "cy_1",
+    name: "Çay",
+    description: "",
+    price: "35₺",
+    category: "Çaylar",
+  },
+  {
+    id: "cy_2",
+    name: "Fincan Çay",
+    description: "",
+    price: "45₺",
+    category: "Çaylar",
+  },
+  {
+    id: "cy_3",
+    name: "Sahlep",
+    description: "",
+    price: "145₺",
+    category: "Çaylar",
+  },
+  {
+    id: "cy_4",
+    name: "Sıcak Çikolata",
+    description: "",
+    price: "125₺",
+    category: "Çaylar",
+  },
+  {
+    id: "cy_5",
+    name: "Sıcak Beyaz Çikolata",
+    description: "",
+    price: "130₺",
+    category: "Çaylar",
+  },
+  // --- BİTKİ ÇAYLARI ---
+  {
+    id: "bc_1",
+    name: "Ada Çayı",
+    description: "",
+    price: "145₺",
+    category: "Bitki Çayları",
+  },
+  {
+    id: "bc_2",
+    name: "Ihlamur Çayı",
+    description: "",
+    price: "140₺",
+    category: "Bitki Çayları",
+  },
+  {
+    id: "bc_3",
+    name: "Kuş Burnu Çayı",
+    description: "",
+    price: "140₺",
+    category: "Bitki Çayları",
+  },
+  {
+    id: "bc_4",
+    name: "Kış Çayı",
+    description: "",
+    price: "145₺",
+    category: "Bitki Çayları",
+  },
 ];
 
 export const CAMPAIGNS: Campaign[] = [
   {
     id: "c1",
     title: "Happy Hour",
-    description: "Hafta içi her gün 16:00 - 19:00 arası tüm kokteyllerde %20 indirim!",
-    image: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&q=80&w=800",
-    category: "İmza Kokteyller"
+    description: "HAFTANIN HERGÜNÜ CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 120 TL",
+    image: "https://i.hizliresim.com/3yy76ol.png",
+    category: "Biralar"
   },
   {
     id: "c2",
-    title: "Fıçı Bira Kampanyası",
-    description: "2 adet 50cl fıçı bira alana patates tava hediye!",
-    image: "https://i.hizliresim.com/6tblcx9.png",
-    category: "Biralar"
+    title: "1+1 Tavuk Kampanyası",
+    description: "SEÇEĞİNİZ TÜM TAVUK YEMEKLERİNDE 1 ALANA 1 BEDAVA SADECE CUMARTESİ HARİÇ SAAT 19:00'A KADAR",
+    image: "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&q=80&w=800",
+    category: "Yemekler"
   },
   {
     id: "c3",
@@ -1861,6 +2011,36 @@ export const CAMPAIGNS: Campaign[] = [
     description: "Salı ve Perşembe akşamları seçili pizzalarda bir alana bir bedava!",
     image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=800",
     category: "Pizzalar"
+  }
+];
+
+export const HEROSLIDES: HeroSlide[] = [
+  {
+    id: "h1",
+    subtitle: "LEZZETİN",
+    title: "EN SICAK",
+    highlight: "HALİ!",
+    description: "Taptaze malzemelerle, usta dokunuşlarla hazırlanır.",
+    image: "https://i.hizliresim.com/p4up7ax.jpg",
+    buttonText: "MENÜYE GİT"
+  },
+  {
+    id: "h2",
+    subtitle: "HAFTANIN HER GÜNÜ",
+    title: "HAPPY",
+    highlight: "HOUR!",
+    description: "CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 120 TL",
+    image: "https://i.hizliresim.com/3yy76ol.png",
+    buttonText: "MENÜYE GİT"
+  },
+  {
+    id: "h3",
+    subtitle: "1 ALANA 1 BEDAVA",
+    title: "1+1 TAVUK",
+    highlight: "KAMPANYASI",
+    description: "SEÇEĞİNİZ TÜM TAVUK YEMEKLERİNDE SADECE CUMARTESİ HARİÇ SAAT 19:00'A KADAR!",
+    image: "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&q=80&w=1200",
+    buttonText: "MENÜYE GİT"
   }
 ];
 

@@ -47,7 +47,7 @@ import {
   Calendar,
 } from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
-import { CATEGORIES, MENU_DATA, MenuItem, CAMPAIGNS, EVENTS } from "../data";
+import { CATEGORIES, MENU_DATA, MenuItem, CAMPAIGNS, EVENTS, HEROSLIDES, HeroSlide } from "../data";
 import { db } from "../lib/firebase";
 import {
   collection,
@@ -248,7 +248,33 @@ export function HomeSection({
   onSearchClick: () => void;
 }) {
   const [activeCampaignIndex, setActiveCampaignIndex] = useState(0);
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const campaignScrollRef = useRef<HTMLDivElement>(null);
+  const heroScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollHero = (direction: 'left' | 'right') => {
+    if (heroScrollRef.current) {
+      const container = heroScrollRef.current;
+      const itemWidth = container.offsetWidth;
+      container.scrollBy({
+        left: direction === 'left' ? -itemWidth : itemWidth,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const handleHeroScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollLeft = e.currentTarget.scrollLeft;
+    const container = e.currentTarget;
+    if (container.children.length > 0) {
+      const firstChild = container.children[0] as HTMLElement;
+      const itemWidth = firstChild.offsetWidth;
+      const index = Math.round(scrollLeft / itemWidth);
+      if (index !== activeHeroIndex && index >= 0 && index < HEROSLIDES.length) {
+        setActiveHeroIndex(index);
+      }
+    }
+  };
 
   const handleCampaignScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
@@ -272,57 +298,102 @@ export function HomeSection({
     >
       {/* Hero Section Container */}
       <div className="px-5 mt-4">
-        {/* The big image card */}
-        <div className="relative h-[480px] rounded-[32px] overflow-hidden shadow-2xl group">
-          <img
-            src="https://i.hizliresim.com/p4up7ax.jpg"
-            alt="Pizza"
-            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-          />
-          {/* Gradient for text contrast */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-          
-          <div className="absolute inset-0 p-8 flex flex-col justify-end">
-            <div className="mb-auto mt-8">
-              <span className="text-white font-bold tracking-[0.3em] text-[13px] block mb-2 drop-shadow-md">
-                LEZZETİN
-              </span>
-              <h2 className="text-white font-black text-5xl leading-[0.9] drop-shadow-lg mb-1" style={{fontFamily: 'Impact, sans-serif'}}>
-                EN SICAK
-              </h2>
-              <h2 className="text-bamm-yellow font-black text-6xl leading-[0.9] italic drop-shadow-lg transform -rotate-1" style={{fontFamily: 'Impact, sans-serif'}}>
-                HALİ!
-              </h2>
-              <p className="text-gray-300 mt-6 text-[13px] leading-relaxed max-w-[200px] font-medium drop-shadow-md">
-                Taptaze malzemelerle, usta dokunuşlarla hazırlanır.
-              </p>
-              
-              {/* Optional yellow line */}
-              <div className="w-12 h-[2px] bg-bamm-yellow mt-6 opacity-80" />
-            </div>
+        {/* Scrollable Container with navigation */}
+        <div className="relative group/hero">
+          <div 
+            ref={heroScrollRef}
+            onScroll={handleHeroScroll}
+            className="relative h-[480px] flex overflow-x-auto snap-x snap-mandatory no-scrollbar rounded-[32px] shadow-2xl"
+          >
+            {HEROSLIDES.map((slide) => (
+              <div key={slide.id} className="min-w-full h-full relative snap-start shrink-0 group">
+                <img
+                  src={slide.image}
+                  alt={slide.title}
+                  className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                  referrerPolicy="no-referrer"
+                />
+                {/* Gradient for text contrast */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                
+                <div className="absolute inset-0 p-8 flex flex-col justify-end">
+                  <div className="mb-auto mt-8">
+                    <span className="text-white font-bold tracking-[0.3em] text-[13px] block mb-2 drop-shadow-md">
+                      {slide.subtitle}
+                    </span>
+                    <h2 className="text-white font-black text-5xl leading-[0.9] drop-shadow-lg mb-1" style={{fontFamily: 'Impact, sans-serif'}}>
+                      {slide.title}
+                    </h2>
+                    <h2 className="text-bamm-yellow font-black text-6xl leading-[0.9] italic drop-shadow-lg transform -rotate-1" style={{fontFamily: 'Impact, sans-serif'}}>
+                      {slide.highlight}
+                    </h2>
+                    <p className="text-gray-300 mt-6 text-[13px] leading-relaxed max-w-[200px] font-medium drop-shadow-md">
+                      {slide.description}
+                    </p>
+                    
+                    {/* Optional yellow line */}
+                    <div className="w-12 h-[2px] bg-bamm-yellow mt-6 opacity-80" />
+                  </div>
 
-            {/* Play Button - Menüye Git */}
-            <div className="flex items-center gap-4 mt-auto relative z-10">
-              <motion.button
-                onClick={() => onMenuClick()}
-                whileTap={{ scale: 0.95 }}
-                className="w-14 h-14 rounded-full bg-gradient-to-br from-black/80 to-black/40 border border-bamm-yellow/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_20px_rgba(255,215,0,0.15)]"
+                  {/* Play Button - Menüye Git */}
+                  <div className="flex items-center gap-4 mt-auto relative z-10">
+                    <motion.button
+                      onClick={() => onMenuClick()}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-14 h-14 rounded-full bg-gradient-to-br from-black/80 to-black/40 border border-bamm-yellow/30 flex items-center justify-center backdrop-blur-md shadow-[0_0_20px_rgba(255,215,0,0.15)]"
+                    >
+                      <div className="w-0 h-0 border-t-[7px] border-t-transparent border-l-[11px] border-l-bamm-yellow border-b-[7px] border-b-transparent ml-1" />
+                    </motion.button>
+                    <span className="text-gray-200 font-bold text-[11px] tracking-[0.2em] uppercase drop-shadow-md">
+                      {slide.buttonText}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Navigation Arrows */}
+          {HEROSLIDES.length > 1 && (
+            <>
+              <button 
+                onClick={() => scrollHero('left')}
+                className={`absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white transition-all z-20 md:flex hidden hover:bg-black/50 ${activeHeroIndex === 0 ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}
               >
-                <div className="w-0 h-0 border-t-[7px] border-t-transparent border-l-[11px] border-l-bamm-yellow border-b-[7px] border-b-transparent ml-1" />
-              </motion.button>
-              <span className="text-gray-200 font-bold text-[11px] tracking-[0.2em] uppercase drop-shadow-md">
-                MENÜYE GİT
-              </span>
-            </div>
+                <ChevronLeft size={24} />
+              </button>
+              <button 
+                onClick={() => scrollHero('right')}
+                className={`absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white transition-all z-20 md:flex hidden hover:bg-black/50 ${activeHeroIndex === HEROSLIDES.length - 1 ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}
+              >
+                <ChevronRight size={24} />
+              </button>
+            </>
+          )}
+
+          {/* Swipe Hint for Mobile */}
+          <div className="absolute bottom-14 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 md:hidden pointer-events-none">
+            <motion.div 
+              animate={{ x: [0, -8, 8, 0] }}
+              transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+              className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/20 backdrop-blur-sm border border-white/5"
+            >
+              <ChevronLeft size={10} className="text-white/40" />
+              <span className="text-white/60 text-[9px] font-bold tracking-[0.2em] uppercase">Kaydırın</span>
+              <ChevronRight size={10} className="text-white/40" />
+            </motion.div>
           </div>
-          
-          {/* Carousel dots */}
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-bamm-yellow" />
-            <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-            <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-          </div>
+        </div>
+
+        {/* Carousel dots */}
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none">
+          {HEROSLIDES.map((_, idx) => (
+            <div 
+              key={idx} 
+              className={`h-1.5 rounded-full transition-all duration-300 ${activeHeroIndex === idx ? 'bg-bamm-yellow w-4' : 'bg-white/30 w-1.5'}`} 
+            />
+          ))}
         </div>
 
         {/* Buttons Below Card */}
@@ -424,7 +495,7 @@ export function HomeSection({
             Kategoriler
           </h2>
           <button
-            onClick={onMenuClick}
+            onClick={() => onMenuClick()}
             className="text-bamm-yellow text-[9px] font-black tracking-[0.2em] uppercase border-b border-bamm-yellow/20 pb-0.5"
           >
             Tümünü Gör
@@ -438,24 +509,19 @@ export function HomeSection({
               color: "#A855F7",
             },
             {
-              name: "Burgerler",
-              img: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&q=80&w=600",
-              color: "#F97316",
-            },
-            {
               name: "Kahvaltı",
               img: "https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&q=80&w=600",
               color: "#06B6D4",
             },
             {
-              name: "Pizzalar",
-              img: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=600",
-              color: "#EF4444",
+              name: "Biralar",
+              img: "https://images.unsplash.com/photo-1608270586620-248524c67de9?auto=format&fit=crop&q=80&w=600",
+              color: "#EAB308",
             },
             {
-              name: "Biralar",
-              img: "https://images.unsplash.com/photo-1532634896-26909d0d4b89?auto=format&fit=crop&q=80&w=600",
-              color: "#EAB308",
+              name: "Tatlılar",
+              img: "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&q=80&w=600",
+              color: "#D946EF",
             },
             {
               name: "Sıcak İçecekler",
@@ -510,7 +576,7 @@ export function HomeSection({
             Popüler Lezzetler
           </h2>
           <button
-            onClick={onMenuClick}
+            onClick={() => onMenuClick()}
             className="text-bamm-yellow text-[9px] font-black tracking-widest uppercase border-b border-bamm-yellow/20 pb-0.5"
           >
             Tümünü Gör
@@ -562,7 +628,7 @@ export function HomeSection({
                 <div className="flex justify-between items-center relative z-10 pt-2 border-t border-white/5">
                   <div className="flex items-baseline gap-0.5">
                     <span className="text-xl font-black text-white tracking-tighter">
-                      {item.price.replace(" TL", "")}
+                      {item.price.replace(/ TL|₺/g, "")}
                     </span>
                     <span className="text-[10px] font-bold text-gray-400">
                       TL
@@ -739,6 +805,31 @@ const CATEGORY_LABELS: Record<string, string> = {
   "Soğuk İçecekler": "SOĞUK",
 };
 
+const CATEGORY_ORDER = [
+  "Popüler",
+  "Yemekler",
+  "Ana Yemekler",
+  "Atıştırmalıklar",
+  "Burgerler",
+  "Pizzalar",
+  "Makarnalar",
+  "Salatalar",
+  "Dürümler & Bowl",
+  "Tost & Sandviç",
+  "Kahvaltı",
+  "Tatlılar",
+  "Kokteyller",
+  "Biralar",
+  "Şarap",
+  "Kadeh",
+  "Şişeler",
+  "Kahveler",
+  "Çaylar",
+  "Bitki Çayları",
+  "Sıcak İçecekler",
+  "Soğuk İçecekler"
+];
+
 // --- Menu Section ---
 export function MenuSection({
   onProductClick,
@@ -773,7 +864,14 @@ export function MenuSection({
       ...CATEGORIES,
       ...liveMenu.map((item) => item.category).filter(Boolean),
     ])
-  );
+  ).sort((a, b) => {
+    const orderA = CATEGORY_ORDER.indexOf(a);
+    const orderB = CATEGORY_ORDER.indexOf(b);
+    if (orderA !== -1 && orderB !== -1) return orderA - orderB;
+    if (orderA !== -1) return -1;
+    if (orderB !== -1) return 1;
+    return a.localeCompare(b);
+  });
 
   useEffect(() => {
     // Sadece admin panelinden eklenenleri değil, her şeyi birleştirmek için.
@@ -854,7 +952,7 @@ export function MenuSection({
             className="relative h-[220px] rounded-[24px] overflow-hidden flex flex-col justify-center shadow-[0_12px_32px_rgba(0,0,0,0.15)] cursor-pointer active:scale-[0.98] transition-all"
           >
             <img
-              src="https://i.hizliresim.com/cvn2hrd.png"
+              src="https://i.hizliresim.com/3yy76ol.png"
               alt="Happy Hour"
               className="absolute inset-0 w-full h-full object-cover object-center"
               referrerPolicy="no-referrer"
@@ -888,7 +986,7 @@ export function MenuSection({
                   strokeWidth={2.5}
                 />
                 <span className="text-white text-[15px] font-bold tracking-widest">
-                  17:00 - 19:00
+                  19:00 'A KADAR
                 </span>
               </div>
               
@@ -896,13 +994,13 @@ export function MenuSection({
               
               <div className="flex flex-col">
                 <span className="text-white text-sm sm:text-[15px] font-normal tracking-wide mb-1">
-                  Tüm kokteyllerde
+                  CUMARTESİ HARİÇ HER GÜN
                 </span>
                 <span 
-                  className="text-bamm-yellow text-[26px] sm:text-[34px] font-black italic tracking-tighter leading-none uppercase" 
+                  className="text-bamm-yellow text-[22px] sm:text-[30px] font-black italic tracking-tighter leading-none uppercase" 
                   style={{ transform: 'scaleY(1.1)', transformOrigin: 'bottom left', fontFamily: 'Impact, sans-serif' }}
                 >
-                  %20 İNDİRİM!
+                  TUBORG ŞİŞE 120 TL
                 </span>
               </div>
             </div>
@@ -932,7 +1030,8 @@ export function MenuSection({
       {/* Category Navigation Area */}
       <div className="bg-white rounded-t-[40px] pt-6 flex-1 flex flex-col relative shadow-[0_-10px_20px_rgba(0,0,0,0.02)] border-t border-gray-100">
         <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0">
-          {dynamicCategories.map((cat) => {
+          {dynamicCategories
+            .map((cat) => {
             const isActive = selectedCategory === cat;
             const Icon = CATEGORY_ICONS[cat] || Utensils;
             const itemCount = liveMenu.filter(item => cat === "Popüler" ? item.isPopular : item.category === cat).length;
@@ -1198,7 +1297,7 @@ export function MenuSection({
                   <div className="flex flex-col items-end gap-3 pl-2 relative z-10 flex-shrink-0">
                     <div className="flex items-baseline gap-0.5">
                       <span className="text-[22px] font-black text-gray-900 tracking-tighter">
-                        {item.price.replace(" TL", "")}
+                        {item.price.replace(/ TL|₺/g, "")}
                       </span>
                       <span className="text-[10px] font-bold text-gray-400">
                         TL

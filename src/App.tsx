@@ -146,6 +146,20 @@ export default function App() {
                   </motion.div>
                 </AnimatePresence>
               </div>
+
+              {/* Salera Digital Signature */}
+              <footer className="py-20 mt-auto text-center opacity-30 hover:opacity-100 transition-opacity duration-1000 group">
+                <div className="flex flex-col items-center gap-4">
+                  <div className={`w-12 h-[1px] transition-all duration-1000 group-hover:w-20 ${["menu", "contact"].includes(activeTab) ? "bg-gray-200" : "bg-white/10"}`} />
+                  <p className={`text-[8px] font-black tracking-[0.5em] uppercase leading-relaxed ${["menu", "contact"].includes(activeTab) ? "text-gray-400" : "text-gray-500"}`}>
+                    Digital Experience & Development <br/>
+                    <span className={`text-[10px] sm:text-[11px] mt-2 inline-block tracking-[0.3em] transition-colors ${["menu", "contact"].includes(activeTab) ? "text-gray-900" : "text-white"}`}>
+                      SALERA DIGITAL
+                    </span>
+                  </p>
+                  <div className={`w-1 h-1 rounded-full ${["menu", "contact"].includes(activeTab) ? "bg-bamm-yellow" : "bg-bamm-yellow"} opacity-40`} />
+                </div>
+              </footer>
             </main>
 
             <BottomNav
