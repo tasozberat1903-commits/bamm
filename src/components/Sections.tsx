@@ -251,6 +251,7 @@ export function HomeSection({
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const campaignScrollRef = useRef<HTMLDivElement>(null);
   const heroScrollRef = useRef<HTMLDivElement>(null);
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
 
   const scrollHero = (direction: 'left' | 'right') => {
     if (heroScrollRef.current) {
@@ -305,12 +306,12 @@ export function HomeSection({
             onScroll={handleHeroScroll}
             className="relative h-[480px] flex overflow-x-auto snap-x snap-mandatory no-scrollbar rounded-[32px] shadow-2xl"
           >
-            {HEROSLIDES.map((slide) => (
-              <div key={slide.id} className="min-w-full h-full relative snap-start shrink-0 group">
+            {HEROSLIDES.map((slide, idx) => (
+              <div key={slide.id} className="min-w-full h-full relative snap-start shrink-0 group overflow-hidden">
                 <img
                   src={slide.image}
                   alt={slide.title}
-                  className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                   referrerPolicy="no-referrer"
                 />
                 {/* Gradient for text contrast */}
@@ -501,7 +502,10 @@ export function HomeSection({
             Tümünü Gör
           </button>
         </div>
-        <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-6 px-6 pb-6">
+        <div 
+          ref={categoryScrollRef}
+          className="flex gap-4 overflow-x-auto no-scrollbar -mx-6 px-6 pb-6"
+        >
           {[
             {
               name: "Kokteyller",
@@ -756,20 +760,17 @@ const CATEGORY_ICONS: Record<string, any> = {
   Popüler: Star,
   Kahvaltı: Coffee,
   Atıştırmalıklar: Zap,
-  "Tost & Sandviç": Sandwich,
-  "Dürümler & Bowl": Beef,
-  Burgerler: Utensils,
-  Pizzalar: Pizza,
-  Makarnalar: Flame,
   Salatalar: Leaf,
-  "Ana Yemekler": UtensilsCrossed,
   Yemekler: UtensilsCrossed,
   Tatlılar: Cookie,
   Kokteyller: Wine,
+  "Alkolsüz Kokteyller": CupSoda,
   Kampanyalar: BadgePercent,
   Biralar: Beer,
   "Sıcak İçecekler": Coffee,
   "Soğuk İçecekler": CupSoda,
+  "Soft İçecekler": CupSoda,
+  "Soğuk Kahveler": CupSoda,
 };
 
 const CATEGORY_DESCS: Record<string, string> = {
@@ -789,45 +790,40 @@ const CATEGORY_LABELS: Record<string, string> = {
   Popüler: "POPÜLER",
   Kahvaltı: "KAHVALTI",
   Atıştırmalıklar: "ATIŞTIR",
-  "Tost & Sandviç": "TOST",
-  "Dürümler & Bowl": "DÜRÜM",
-  Burgerler: "BURGER",
-  Pizzalar: "PİZZA",
-  Makarnalar: "MAKARNA",
   Salatalar: "SALATA",
-  "Ana Yemekler": "A.YEMEK",
   Yemekler: "YEMEK",
   Tatlılar: "TATLILAR",
   Kokteyller: "KOKTEYL",
+  "Alkolsüz Kokteyller": "ALKOLSÜZ",
   Kampanyalar: "KAMPANYA",
   Biralar: "BİRA",
   "Sıcak İçecekler": "SICAK",
   "Soğuk İçecekler": "SOĞUK",
+  "Soft İçecekler": "SOFT",
+  "Soğuk Kahveler": "S.KAHVE",
 };
 
 const CATEGORY_ORDER = [
-  "Popüler",
+  "Kampanyalar",
+  "Biralar",
+  "Kokteyller",
   "Yemekler",
-  "Ana Yemekler",
+  "Popüler",
   "Atıştırmalıklar",
-  "Burgerler",
-  "Pizzalar",
-  "Makarnalar",
   "Salatalar",
-  "Dürümler & Bowl",
-  "Tost & Sandviç",
   "Kahvaltı",
   "Tatlılar",
-  "Kokteyller",
-  "Biralar",
+  "Alkolsüz Kokteyller",
   "Şarap",
   "Kadeh",
   "Şişeler",
   "Kahveler",
+  "Soğuk Kahveler",
   "Çaylar",
   "Bitki Çayları",
   "Sıcak İçecekler",
-  "Soğuk İçecekler"
+  "Soğuk İçecekler",
+  "Soft İçecekler"
 ];
 
 // --- Menu Section ---
@@ -880,7 +876,17 @@ export function MenuSection({
     const unsub = onSnapshot(collection(db, "products"), (snap) => {
       if (!snap.empty) {
         const dbProducts = snap.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() }) as any,
+          (doc) => {
+            const data = doc.data() as any;
+            if (["Burgerler", "Pizzalar", "Makarnalar", "Dürümler & Bowl", "Ana Yemekler"].includes(data.category)) {
+              data.subcategory = data.category === "Dürümler & Bowl" ? "Wrapler" : (data.category === "Ana Yemekler" ? "Beyaz Etler" : data.category);
+              data.category = "Yemekler";
+            } else if (data.category === "Tost & Sandviç") {
+              data.subcategory = "Tostlar";
+              data.category = "Kahvaltı";
+            }
+            return { id: doc.id, ...data };
+          }
         );
 
         // Veritabanındaki ürünler (id'si olanlar MENU_DATA'yı ezsin, yenileri eklensin)
@@ -906,7 +912,7 @@ export function MenuSection({
         : item.category === selectedCategory;
 
     let matchesSubcategory = true;
-    if ((selectedCategory === "Kokteyller" || selectedCategory === "Biralar" || selectedCategory === "Kampanyalar" || selectedCategory === "Yemekler" || selectedCategory === "Kahvaltı" || selectedCategory === "Kadeh" || selectedCategory === "Şişeler" || selectedCategory === "Şarap") && selectedSubcategory !== "Tümü") {
+    if ((selectedCategory === "Kokteyller" || selectedCategory === "Alkolsüz Kokteyller" || selectedCategory === "Biralar" || selectedCategory === "Kampanyalar" || selectedCategory === "Yemekler" || selectedCategory === "Kahvaltı" || selectedCategory === "Kadeh" || selectedCategory === "Şişeler" || selectedCategory === "Şarap" || selectedCategory === "Tatlılar") && selectedSubcategory !== "Tümü") {
       matchesSubcategory = item.subcategory === selectedSubcategory;
     }
 
@@ -1087,9 +1093,47 @@ export function MenuSection({
           })}
         </div>
 
+        {selectedCategory === "Tatlılar" && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
+            {["Tümü", "Sıcaklar", "Soğuklar"].map((subcat) => (
+              <button
+                key={subcat}
+                onClick={() => setSelectedSubcategory(subcat)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
+                  selectedSubcategory === subcat
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {subcat === "Tümü" && <ListFilter size={16} />}
+                {subcat}
+              </button>
+            ))}
+          </div>
+        )}
+
         {selectedCategory === "Kokteyller" && (
           <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
             {["Tümü", "İmza Kokteylleri", "Dünya Klasikleri"].map((subcat) => (
+              <button
+                key={subcat}
+                onClick={() => setSelectedSubcategory(subcat)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
+                  selectedSubcategory === subcat
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {subcat === "Tümü" && <ListFilter size={16} />}
+                {subcat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {selectedCategory === "Alkolsüz Kokteyller" && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
+            {["Tümü", "Healthy Detox", "Smoothie", "Frozen", "Milkshakes", "Limonata"].map((subcat) => (
               <button
                 key={subcat}
                 onClick={() => setSelectedSubcategory(subcat)}

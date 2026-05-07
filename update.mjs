@@ -8,7 +8,6 @@ const CATEGORY_IMAGES = {
     "Pizzalar": "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?auto=format&fit=crop&q=80&w=800",
     "Makarnalar": "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&q=80&w=800",
     "Salatalar": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800",
-    "Ana Yemekler": "https://images.unsplash.com/photo-1544025162-817ebc10b7b1?auto=format&fit=crop&q=80&w=800",
     "Tatlılar": "https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&q=80&w=800",
     "Kokteyller": "https://images.unsplash.com/photo-1536935338686-2dc2fcb1b22e?auto=format&fit=crop&q=80&w=800",
     "Biralar": "https://images.unsplash.com/photo-1608270586620-248524c67de9?auto=format&fit=crop&q=80&w=800",
