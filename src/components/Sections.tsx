@@ -64,10 +64,12 @@ export function Header({
   isLight,
   onSearchClick,
   onAdminClick,
+  onLogoClick,
 }: {
   isLight?: boolean;
   onSearchClick: () => void;
   onAdminClick?: () => void;
+  onLogoClick?: () => void;
 }) {
   return (
     <header
@@ -85,9 +87,10 @@ export function Header({
       </div>
 
       {/* Centered Logo */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
         <div
-          className={`w-14 h-14 ${isLight ? "bg-white" : "bg-bamm-black"} rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,215,0,0.15)] overflow-hidden border ${isLight ? "border-black/5" : "border-white/10"}`}
+          onClick={onLogoClick}
+          className={`w-14 h-14 ${isLight ? "bg-white" : "bg-bamm-black"} rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,215,0,0.15)] overflow-hidden border ${isLight ? "border-black/5" : "border-white/10"} cursor-pointer active:scale-90 transition-transform`}
         >
           <img
             src="https://i.hizliresim.com/guz3g2u.jpg"
@@ -903,8 +906,11 @@ export function MenuSection({
       {/* White Top Header Area */}
       <div className="bg-white pt-4 pb-8">
         <div className="px-6 flex items-center justify-between mb-8">
-          <button className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full border border-gray-100 shadow-sm">
-            <MenuIcon size={20} strokeWidth={2} />
+          <button 
+            onClick={onBackClick}
+            className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full border border-gray-100 shadow-sm"
+          >
+            <ArrowLeft size={20} strokeWidth={2} />
           </button>
 
           <div className="flex flex-col items-center justify-center">

@@ -329,26 +329,41 @@ export function AdminPanel() {
       </div>
 
       {/* Bottom Navigation - Mobile */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#16191E]/80 backdrop-blur-xl border-t border-white/5 px-4 py-3 flex items-center justify-around">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#121418] border-t border-white/5 px-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         {[
           { id: "dashboard", icon: LayoutDashboard, label: "Özet" },
           { id: "products", icon: Utensils, label: "Ürünler" },
           { id: "settings", icon: Settings, label: "Ayarlar" },
-        ].map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id as any)}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeTab === item.id ? "text-bamm-yellow" : "text-gray-500"
-            }`}
-          >
-            <item.icon size={20} />
-            <span className="text-[10px] font-bold uppercase tracking-wider">{item.label}</span>
-          </button>
-        ))}
-        <button onClick={handleLogout} className="flex flex-col items-center gap-1 text-red-500">
-          <LogOut size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Çıkış</span>
+        ].map((item) => {
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id as any)}
+              className={`flex flex-col items-center gap-1.5 transition-all relative ${
+                isActive ? "text-bamm-yellow scale-110" : "text-gray-500 hover:text-white"
+              }`}
+            >
+              <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+              <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isActive ? "opacity-100" : "opacity-60"}`}>
+                {item.label}
+              </span>
+              {isActive && (
+                <motion.div 
+                  layoutId="adminTabIndicator"
+                  className="absolute -bottom-2 w-1 h-1 bg-bamm-yellow rounded-full"
+                />
+              )}
+            </button>
+          );
+        })}
+        <div className="w-[1px] h-8 bg-white/5 mx-2" />
+        <button 
+          onClick={handleLogout} 
+          className="flex flex-col items-center gap-1.5 text-red-500/80 hover:text-red-500 transition-colors"
+        >
+          <LogOut size={22} />
+          <span className="text-[9px] font-black uppercase tracking-[0.1em] opacity-60">Çıkış</span>
         </button>
       </div>
 

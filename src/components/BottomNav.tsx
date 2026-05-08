@@ -9,6 +9,8 @@ interface BottomNavProps {
 }
 
 export default function BottomNav({ activeTab, setActiveTab, onInfoClick }: BottomNavProps) {
+  if (activeTab === "admin") return null;
+
   const tabs = [
     { id: "home", icon: Home },
     { id: "menu", icon: Utensils },

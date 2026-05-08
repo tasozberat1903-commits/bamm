@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import BottomNav from "./components/BottomNav";
 import {
@@ -25,6 +25,13 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+
+  const scrollToTop = () => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   // Function to navigate to menu with a specific category
   const navigateToMenu = (category?: string) => {
@@ -134,11 +141,12 @@ export default function App() {
           </motion.div>
         ) : (
           <>
-            <main className="flex-1 overflow-y-auto no-scrollbar relative">
+            <main ref={mainRef} className="flex-1 overflow-y-auto no-scrollbar relative">
               {activeTab !== "menu" && (
                 <Header
                   isLight={["contact", "menu"].includes(activeTab)}
                   onSearchClick={() => setIsSearchOpen(true)}
+                  onLogoClick={scrollToTop}
                 />
               )}
 
