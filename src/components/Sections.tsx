@@ -528,9 +528,9 @@ export function HomeSection({
               color: "#D946EF",
             },
             {
-              name: "Sıcak İçecekler",
-              img: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&q=80&w=600",
-              color: "#D97706",
+              name: "Soğuk İçecekler",
+              img: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&q=80&w=600",
+              color: "#3B82F6",
             },
           ].map((cat, i) => (
             <motion.div
@@ -660,22 +660,9 @@ export function HomeSection({
         </div>
         <div className="flex items-center gap-5">
           <a
-            href="#"
-            className="w-14 h-14 bg-white rounded-[20px] flex items-center justify-center text-gray-800 shadow-[0_8px_16px_rgba(0,0,0,0.04)] border border-black/[0.02] hover:-translate-y-1.5 hover:bg-black hover:text-white hover:shadow-[0_12px_24px_rgba(0,0,0,0.15)] active:scale-95 transition-all duration-300 group"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="group-hover:scale-110 transition-transform duration-300"
-            >
-              <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
-            </svg>
-          </a>
-          <a
-            href="#"
+            href="https://instagram.com/bammgarden"
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-14 h-14 bg-white rounded-[20px] flex items-center justify-center text-gray-800 shadow-[0_8px_16px_rgba(0,0,0,0.04)] border border-black/[0.02] hover:-translate-y-1.5 hover:bg-gradient-to-tr hover:from-[#f09433] hover:via-[#dc2743] hover:to-[#bc1888] hover:text-white hover:shadow-[0_12px_24px_rgba(220,39,67,0.25)] active:scale-95 transition-all duration-300 group"
           >
             <Instagram
@@ -683,21 +670,6 @@ export function HomeSection({
               strokeWidth={2}
               className="group-hover:scale-110 transition-transform duration-300"
             />
-          </a>
-          <a
-            href="#"
-            className="w-14 h-14 bg-white rounded-[20px] flex items-center justify-center text-gray-800 shadow-[0_8px_16px_rgba(0,0,0,0.04)] border border-black/[0.02] hover:-translate-y-1.5 hover:bg-black hover:text-white hover:shadow-[0_12px_24px_rgba(0,0,0,0.15)] active:scale-95 transition-all duration-300 group"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="group-hover:scale-110 transition-transform duration-300"
-            >
-              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 15.68a6.34 6.34 0 0 0 6.27 6.28A6.35 6.35 0 0 0 15.82 17l.01-10.3a8.21 8.21 0 0 0 5 1.78V5.04a5.07 5.07 0 0 1-1.24.15 4.9 4.9 0 0 1 0 1.5z" />
-            </svg>
           </a>
         </div>
       </div>
@@ -820,7 +792,6 @@ const CATEGORY_ORDER = [
   "Kahveler",
   "Soğuk Kahveler",
   "Çaylar",
-  "Bitki Çayları",
   "Sıcak İçecekler",
   "Soğuk İçecekler",
   "Soft İçecekler"
@@ -860,7 +831,7 @@ export function MenuSection({
       ...CATEGORIES,
       ...liveMenu.map((item) => item.category).filter(Boolean),
     ])
-  ).sort((a, b) => {
+  ).filter(cat => cat !== "Sıcak İçecekler").sort((a, b) => {
     const orderA = CATEGORY_ORDER.indexOf(a);
     const orderB = CATEGORY_ORDER.indexOf(b);
     if (orderA !== -1 && orderB !== -1) return orderA - orderB;
@@ -912,7 +883,7 @@ export function MenuSection({
         : item.category === selectedCategory;
 
     let matchesSubcategory = true;
-    if ((selectedCategory === "Kokteyller" || selectedCategory === "Alkolsüz Kokteyller" || selectedCategory === "Biralar" || selectedCategory === "Kampanyalar" || selectedCategory === "Yemekler" || selectedCategory === "Kahvaltı" || selectedCategory === "Kadeh" || selectedCategory === "Şişeler" || selectedCategory === "Şarap" || selectedCategory === "Tatlılar") && selectedSubcategory !== "Tümü") {
+    if ((selectedCategory === "Kokteyller" || selectedCategory === "Alkolsüz Kokteyller" || selectedCategory === "Biralar" || selectedCategory === "Kampanyalar" || selectedCategory === "Yemekler" || selectedCategory === "Kahvaltı" || selectedCategory === "Kadeh" || selectedCategory === "Şişeler" || selectedCategory === "Şarap" || selectedCategory === "Tatlılar" || selectedCategory === "Çaylar") && selectedSubcategory !== "Tümü") {
       matchesSubcategory = item.subcategory === selectedSubcategory;
     }
 
@@ -1267,6 +1238,25 @@ export function MenuSection({
         {selectedCategory === "Şarap" && (
           <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
             {["Tümü", "Kadeh", "Şişeler"].map((subcat) => (
+              <button
+                key={subcat}
+                onClick={() => setSelectedSubcategory(subcat)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
+                  selectedSubcategory === subcat
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {subcat === "Tümü" && <ListFilter size={16} />}
+                {subcat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {selectedCategory === "Çaylar" && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
+            {["Tümü", "Klasik", "Bitki Çayları"].map((subcat) => (
               <button
                 key={subcat}
                 onClick={() => setSelectedSubcategory(subcat)}
@@ -1770,22 +1760,6 @@ export function ProductDetail({
   product: MenuItem | null;
   onClose: () => void;
 }) {
-  const [crossSellProduct, setCrossSellProduct] = useState<MenuItem | null>(
-    null,
-  );
-
-  useEffect(() => {
-    if (product) {
-      const others = MENU_DATA.filter(
-        (m) => m.id !== product.id && m.isPopular,
-      );
-      const random =
-        others[Math.floor(Math.random() * Math.max(1, others.length))] ||
-        others[0];
-      setCrossSellProduct(random || null);
-    }
-  }, [product]);
-
   if (!product) return null;
 
   return (
@@ -1895,47 +1869,6 @@ export function ProductDetail({
                 }
               </p>
             </div>
-
-            {/* Cross Sell */}
-            {crossSellProduct && (
-              <div className="mt-4 border-t border-black/[0.04] pt-6 mb-10 pb-10">
-                <div className="flex items-center gap-2 mb-4">
-                  <Star
-                    size={14}
-                    className="text-bamm-yellow fill-bamm-yellow"
-                  />
-                  <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-900 leading-none">
-                    Birlikte Gider
-                  </h3>
-                </div>
-
-                <div className="bg-white p-3 rounded-[20px] flex items-center gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.02)] border border-black/[0.03]">
-                  <div className="w-[52px] h-[52px] rounded-xl bg-gray-50 overflow-hidden relative shrink-0">
-                    {crossSellProduct.image ? (
-                      <img
-                        src={crossSellProduct.image}
-                        alt={crossSellProduct.name}
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Flame size={20} className="text-gray-300" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-black text-gray-900 truncate mb-0.5">
-                      {crossSellProduct.name}
-                    </h4>
-                    <p className="text-[11px] font-bold text-[#AD1519]">
-                      {crossSellProduct.price}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </motion.div>
       </div>

@@ -41,6 +41,17 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === '#admin') {
+        setActiveTab('admin');
+      }
+    };
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
+
   const renderSection = () => {
     switch (activeTab) {
       case "home":
@@ -66,7 +77,6 @@ export default function App() {
         return (
           <ContactSection
             onSearchClick={() => setIsSearchOpen(true)}
-            onAdminClick={() => setActiveTab("admin")}
           />
         );
       case "admin":
@@ -129,7 +139,6 @@ export default function App() {
                 <Header
                   isLight={["contact", "menu"].includes(activeTab)}
                   onSearchClick={() => setIsSearchOpen(true)}
-                  onAdminClick={activeTab !== "admin" ? () => setActiveTab("admin") : undefined}
                 />
               )}
 
@@ -148,7 +157,14 @@ export default function App() {
               </div>
 
               {/* Salera Digital Signature */}
-              <footer className="py-20 mt-auto text-center opacity-30 hover:opacity-100 transition-opacity duration-1000 group">
+              <footer 
+                className="py-20 mt-auto text-center opacity-30 hover:opacity-100 transition-opacity duration-1000 group cursor-default"
+                onClick={(e) => {
+                  if (e.detail === 5) {
+                    window.location.hash = 'admin';
+                  }
+                }}
+              >
                 <div className="flex flex-col items-center gap-4">
                   <div className={`w-12 h-[1px] transition-all duration-1000 group-hover:w-20 ${["menu", "contact"].includes(activeTab) ? "bg-gray-200" : "bg-white/10"}`} />
                   <p className={`text-[8px] font-black tracking-[0.5em] uppercase leading-relaxed ${["menu", "contact"].includes(activeTab) ? "text-gray-400" : "text-gray-500"}`}>

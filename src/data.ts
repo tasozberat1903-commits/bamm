@@ -39,7 +39,7 @@ export interface HeroSlide {
 }
 
 export const CATEGORIES = [
-  "Kampanyalar", "Yemekler", "Kadeh", "Şişeler", "Şarap", "Kokteyller", "Alkolsüz Kokteyller", "Biralar", "Popüler", "Kahvaltı", "Kahveler", "Soğuk Kahveler", "Çaylar", "Bitki Çayları", "Atıştırmalıklar", "Salatalar", "Tatlılar", "Sıcak İçecekler", "Soğuk İçecekler", "Soft İçecekler"
+  "Kampanyalar", "Yemekler", "Kadeh", "Şişeler", "Şarap", "Kokteyller", "Alkolsüz Kokteyller", "Biralar", "Popüler", "Kahvaltı", "Kahveler", "Soğuk Kahveler", "Çaylar", "Atıştırmalıklar", "Salatalar", "Tatlılar", "Soğuk İçecekler", "Soft İçecekler"
 ];
 
 export const MENU_DATA: MenuItem[] = [
@@ -2236,6 +2236,14 @@ export const MENU_DATA: MenuItem[] = [
     category: "Şişeler",
     subcategory: "Viski",
   },
+  {
+    id: "sis_te1",
+    name: "Olmeca Blanco",
+    description: "",
+    price: "3500₺",
+    category: "Şişeler",
+    subcategory: "Tekila",
+  },
   // --- KAHVELER ---
   {
     id: "khv_1",
@@ -2321,6 +2329,7 @@ export const MENU_DATA: MenuItem[] = [
     description: "",
     price: "35₺",
     category: "Çaylar",
+    subcategory: "Klasik",
   },
   {
     id: "cy_2",
@@ -2328,6 +2337,7 @@ export const MENU_DATA: MenuItem[] = [
     description: "",
     price: "45₺",
     category: "Çaylar",
+    subcategory: "Klasik",
   },
   {
     id: "cy_3",
@@ -2335,6 +2345,7 @@ export const MENU_DATA: MenuItem[] = [
     description: "",
     price: "145₺",
     category: "Çaylar",
+    subcategory: "Klasik",
   },
   {
     id: "cy_4",
@@ -2342,6 +2353,7 @@ export const MENU_DATA: MenuItem[] = [
     description: "",
     price: "125₺",
     category: "Çaylar",
+    subcategory: "Klasik",
   },
   {
     id: "cy_5",
@@ -2349,6 +2361,7 @@ export const MENU_DATA: MenuItem[] = [
     description: "",
     price: "130₺",
     category: "Çaylar",
+    subcategory: "Klasik",
   },
   // --- BİTKİ ÇAYLARI ---
   {
@@ -2356,28 +2369,32 @@ export const MENU_DATA: MenuItem[] = [
     name: "Ada Çayı",
     description: "",
     price: "145₺",
-    category: "Bitki Çayları",
+    category: "Çaylar",
+    subcategory: "Bitki Çayları",
   },
   {
     id: "bc_2",
     name: "Ihlamur Çayı",
     description: "",
     price: "140₺",
-    category: "Bitki Çayları",
+    category: "Çaylar",
+    subcategory: "Bitki Çayları",
   },
   {
     id: "bc_3",
     name: "Kuş Burnu Çayı",
     description: "",
     price: "140₺",
-    category: "Bitki Çayları",
+    category: "Çaylar",
+    subcategory: "Bitki Çayları",
   },
   {
     id: "bc_4",
     name: "Kış Çayı",
     description: "",
     price: "145₺",
-    category: "Bitki Çayları",
+    category: "Çaylar",
+    subcategory: "Bitki Çayları",
   },
 ];
 

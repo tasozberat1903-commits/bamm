@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "../lib/firebase";
 import {
-  signInWithPopup,
-  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
   User,
@@ -16,7 +16,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { CATEGORIES, MENU_DATA, MenuItem } from "../data";
-import { LogOut, Plus, Edit2, Trash2 } from "lucide-react";
+import { LogOut, Plus, Edit2, Trash2, Nfc, ChevronDown } from "lucide-react";
 
 export function AdminPanel() {
   const [user, setUser] = useState<User | null>(null);
@@ -25,6 +25,7 @@ export function AdminPanel() {
   const [editForm, setEditForm] = useState<Partial<MenuItem>>({});
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("Tümü");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [nfcStatus, setNfcStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -56,13 +57,47 @@ export function AdminPanel() {
     return unsub;
   }, [user]);
 
-  const handleLogin = async () => {
+  const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [loginError, setLoginError] = useState("");
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+
+    if (usernameInput !== "bamm" || passwordInput !== "bamm1616") {
+      setLoginError("Kullanıcı adı veya şifre hatalı.");
+      return;
+    }
+
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      // Create a dummy email to use in Firebase Auth
+      const dummyEmail = "bamm@admin.com";
+      const dummyPassword = passwordInput + "Secure"; // Passwords must be 6+ chars
+
+      try {
+        await signInWithEmailAndPassword(auth, dummyEmail, dummyPassword);
+      } catch (signInErr: any) {
+        if (signInErr.code === "auth/user-not-found" || signInErr.code === "auth/invalid-credential") {
+          // Attempt to create user
+          try {
+            await createUserWithEmailAndPassword(auth, dummyEmail, dummyPassword);
+          } catch (createErr: any) {
+            if (createErr.code === "auth/operation-not-allowed") {
+              setLoginError("Lütfen Firebase Console'dan 'Email/Password' giriş yöntemini aktif edin.");
+            } else {
+              setLoginError("Kayıt hatası: " + createErr.message);
+            }
+          }
+        } else if (signInErr.code === "auth/operation-not-allowed") {
+          setLoginError("Lütfen Firebase Console'dan 'Email/Password' giriş yöntemini aktif edin.");
+        } else {
+          setLoginError("Giriş başarısız: " + signInErr.message);
+        }
+      }
     } catch (error) {
       console.error(error);
-      alert("Giriş başarısız oldu.");
+      setLoginError("Bilinmeyen bir hata oluştu.");
     }
   };
 
@@ -126,6 +161,26 @@ export function AdminPanel() {
     });
   };
 
+  const writeNfcTag = async () => {
+    if ('NDEFReader' in window) {
+      try {
+        setNfcStatus("NFC etiketini telefonunuza yaklaştırın...");
+        const ndef = new (window as any).NDEFReader();
+        await ndef.write({
+          records: [{ recordType: "url", data: window.location.origin }]
+        });
+        setNfcStatus("NFC etiketine başarıyla yazıldı! ✅");
+        setTimeout(() => setNfcStatus(null), 3000);
+      } catch (error) {
+        setNfcStatus("NFC yazma hatası: " + error);
+        setTimeout(() => setNfcStatus(null), 3000);
+      }
+    } else {
+      setNfcStatus("NFC özelliği bu cihaz/tarayıcı tarafından desteklenmiyor. Lütfen Android Chrome kullanın.");
+      setTimeout(() => setNfcStatus(null), 4000);
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-bamm-black px-6 text-white text-center">
@@ -135,12 +190,31 @@ export function AdminPanel() {
         <p className="text-sm text-gray-400 mb-8 max-w-xs">
           Bu alana sadece yetkili kişiler giriş yapabilir.
         </p>
-        <button
-          onClick={handleLogin}
-          className="bg-white text-black px-6 py-3 rounded-xl font-bold uppercase tracking-wider text-sm active:scale-95 transition-transform"
-        >
-          Google ile Giriş Yap
-        </button>
+        <form onSubmit={handleLogin} className="flex flex-col gap-4 w-full max-w-xs">
+          <input
+            type="text"
+            placeholder="Kullanıcı Adı"
+            className="px-4 py-3 rounded-xl bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bamm-yellow border border-white/10"
+            value={usernameInput}
+            onChange={(e) => setUsernameInput(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Şifre"
+            className="px-4 py-3 rounded-xl bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bamm-yellow border border-white/10"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+          />
+          {loginError && (
+            <p className="text-red-400 text-sm mt-1 mb-2">{loginError}</p>
+          )}
+          <button
+            type="submit"
+            className="bg-bamm-yellow text-black px-6 py-3 rounded-xl font-bold uppercase tracking-wider text-sm hover:bg-yellow-400 active:scale-95 transition-all mt-2"
+          >
+            Giriş Yap
+          </button>
+        </form>
       </div>
     );
   }
@@ -154,16 +228,31 @@ export function AdminPanel() {
               Panel
             </h1>
             <p className="text-xs text-gray-400 mt-1">
-              Giriş Yapıldı: <span className="text-white">{user.email}</span>
+              Giriş Yapıldı: <span className="text-white">Admin (bamm)</span>
             </p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-10 h-10 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full flex items-center justify-center transition-all duration-300"
-          >
-            <LogOut size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={writeNfcTag}
+              className="w-10 h-10 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center transition-all duration-300"
+              title="URL'yi NFC Etiketine Yaz"
+            >
+              <Nfc size={18} />
+            </button>
+            <button
+              onClick={handleLogout}
+              className="w-10 h-10 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full flex items-center justify-center transition-all duration-300"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
+
+        {nfcStatus && (
+          <div className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-xl mb-4 text-xs text-center font-bold animate-pulse">
+            {nfcStatus}
+          </div>
+        )}
 
         <button
           onClick={startNew}
@@ -270,10 +359,7 @@ export function AdminPanel() {
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Kategori</label>
                 <div className="relative">
-                  <input
-                    type="text"
-                    list="categories-list"
-                    placeholder="Seç veya yaz"
+                  <select
                     value={editForm.category || ""}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -293,158 +379,183 @@ export function AdminPanel() {
                         subcategory: defaultSubcategory
                       });
                     }}
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors placeholder:text-gray-600"
-                  />
-                  <datalist id="categories-list">
+                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
+                  >
+                    <option value="" disabled className="text-gray-500">Seçiniz</option>
                     {CATEGORIES.map((c) => (
-                      <option key={c} value={c} />
+                      <option key={c} value={c} className="text-black">{c}</option>
                     ))}
-                  </datalist>
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
                 </div>
               </div>
 
               {editForm.category === "Kokteyller" && (
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <select
-                    value={editForm.subcategory || "İmza Kokteylleri"}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, subcategory: e.target.value })
-                    }
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
-                  >
-                    <option value="İmza Kokteylleri" className="text-black">İmza Kokteylleri</option>
-                    <option value="Dünya Klasikleri" className="text-black">Dünya Klasikleri</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={editForm.subcategory || "İmza Kokteylleri"}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, subcategory: e.target.value })
+                      }
+                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
+                    >
+                      <option value="İmza Kokteylleri" className="text-black">İmza Kokteylleri</option>
+                      <option value="Dünya Klasikleri" className="text-black">Dünya Klasikleri</option>
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                  </div>
                 </div>
               )}
 
               {editForm.category === "Biralar" && (
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <select
-                    value={editForm.subcategory || "Fıçı Biralar"}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, subcategory: e.target.value })
-                    }
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
-                  >
-                    <option value="Fıçı Biralar" className="text-black">Fıçı Biralar</option>
-                    <option value="Şişe Biralar" className="text-black">Şişe Biralar</option>
-                    <option value="Kova Biralar" className="text-black">Kova Biralar</option>
-                    <option value="İthal Biralar" className="text-black">İthal Biralar</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={editForm.subcategory || "Fıçı Biralar"}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, subcategory: e.target.value })
+                      }
+                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
+                    >
+                      <option value="Fıçı Biralar" className="text-black">Fıçı Biralar</option>
+                      <option value="Şişe Biralar" className="text-black">Şişe Biralar</option>
+                      <option value="Kova Biralar" className="text-black">Kova Biralar</option>
+                      <option value="İthal Biralar" className="text-black">İthal Biralar</option>
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                  </div>
                 </div>
               )}
 
               {editForm.category === "Kampanyalar" && (
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <select
-                    value={editForm.subcategory || "1+1"}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, subcategory: e.target.value })
-                    }
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
-                  >
-                    <option value="1+1" className="text-black">1+1</option>
-                    <option value="Şarap" className="text-black">Şarap</option>
-                    <option value="Shoot" className="text-black">Shoot</option>
-                    <option value="Fıçı Kampanya" className="text-black">Fıçı Kampanya</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={editForm.subcategory || "1+1"}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, subcategory: e.target.value })
+                      }
+                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
+                    >
+                      <option value="1+1" className="text-black">1+1</option>
+                      <option value="Şarap" className="text-black">Şarap</option>
+                      <option value="Shoot" className="text-black">Shoot</option>
+                      <option value="Fıçı Kampanya" className="text-black">Fıçı Kampanya</option>
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                  </div>
                 </div>
               )}
 
               {editForm.category === "Kadeh" && (
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <select
-                    value={editForm.subcategory || "Vodka"}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, subcategory: e.target.value })
-                    }
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
-                  >
-                    <option value="Vodka" className="text-black">Vodka</option>
-                    <option value="Gin" className="text-black">Gin</option>
-                    <option value="Rakı" className="text-black">Rakı</option>
-                    <option value="Viski" className="text-black">Viski</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={editForm.subcategory || "Vodka"}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, subcategory: e.target.value })
+                      }
+                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
+                    >
+                      <option value="Vodka" className="text-black">Vodka</option>
+                      <option value="Gin" className="text-black">Gin</option>
+                      <option value="Rakı" className="text-black">Rakı</option>
+                      <option value="Viski" className="text-black">Viski</option>
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                  </div>
                 </div>
               )}
 
               {editForm.category === "Şişeler" && (
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <select
-                    value={editForm.subcategory || "Vodka"}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, subcategory: e.target.value })
-                    }
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
-                  >
-                    <option value="Vodka" className="text-black">Vodka</option>
-                    <option value="Gin" className="text-black">Gin</option>
-                    <option value="Tekila" className="text-black">Tekila</option>
-                    <option value="Rakı" className="text-black">Rakı</option>
-                    <option value="Şarap" className="text-black">Şarap</option>
-                    <option value="Viski" className="text-black">Viski</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={editForm.subcategory || "Vodka"}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, subcategory: e.target.value })
+                      }
+                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
+                    >
+                      <option value="Vodka" className="text-black">Vodka</option>
+                      <option value="Gin" className="text-black">Gin</option>
+                      <option value="Tekila" className="text-black">Tekila</option>
+                      <option value="Rakı" className="text-black">Rakı</option>
+                      <option value="Şarap" className="text-black">Şarap</option>
+                      <option value="Viski" className="text-black">Viski</option>
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                  </div>
                 </div>
               )}
 
               {editForm.category === "Şarap" && (
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <select
-                    value={editForm.subcategory || "Kadeh"}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, subcategory: e.target.value })
-                    }
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
-                  >
-                    <option value="Kadeh" className="text-black">Kadeh</option>
-                    <option value="Şişeler" className="text-black">Şişeler</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={editForm.subcategory || "Kadeh"}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, subcategory: e.target.value })
+                      }
+                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
+                    >
+                      <option value="Kadeh" className="text-black">Kadeh</option>
+                      <option value="Şişeler" className="text-black">Şişeler</option>
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                  </div>
                 </div>
               )}
 
               {editForm.category === "Yemekler" && (
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <select
-                    value={editForm.subcategory || "Beyaz Etler"}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, subcategory: e.target.value })
-                    }
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
-                  >
-                    <option value="Beyaz Etler" className="text-black">Beyaz Etler</option>
-                    <option value="Kırmızı Etler" className="text-black">Kırmızı Etler</option>
-                    <option value="Burgerler" className="text-black">Burgerler</option>
-                    <option value="Wrapler" className="text-black">Wrapler</option>
-                    <option value="Makarnalar" className="text-black">Makarnalar</option>
-                    <option value="Pizzalar" className="text-black">Pizzalar</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={editForm.subcategory || "Beyaz Etler"}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, subcategory: e.target.value })
+                      }
+                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
+                    >
+                      <option value="Beyaz Etler" className="text-black">Beyaz Etler</option>
+                      <option value="Kırmızı Etler" className="text-black">Kırmızı Etler</option>
+                      <option value="Burgerler" className="text-black">Burgerler</option>
+                      <option value="Wrapler" className="text-black">Wrapler</option>
+                      <option value="Makarnalar" className="text-black">Makarnalar</option>
+                      <option value="Pizzalar" className="text-black">Pizzalar</option>
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                  </div>
                 </div>
               )}
 
               {editForm.category === "Kahvaltı" && (
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <select
-                    value={editForm.subcategory || "Breakfast"}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, subcategory: e.target.value })
-                    }
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none"
-                  >
-                    <option value="Breakfast" className="text-black">Breakfast</option>
-                    <option value="Omletler" className="text-black">Omletler</option>
-                    <option value="Sahanda" className="text-black">Sahanda</option>
-                    <option value="Tostlar" className="text-black">Tostlar</option>
-                    <option value="Kahvaltı Yanı" className="text-black">Kahvaltı Yanı</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={editForm.subcategory || "Breakfast"}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, subcategory: e.target.value })
+                      }
+                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
+                    >
+                      <option value="Breakfast" className="text-black">Breakfast</option>
+                      <option value="Omletler" className="text-black">Omletler</option>
+                      <option value="Sahanda" className="text-black">Sahanda</option>
+                      <option value="Tostlar" className="text-black">Tostlar</option>
+                      <option value="Kahvaltı Yanı" className="text-black">Kahvaltı Yanı</option>
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                  </div>
                 </div>
               )}
 
