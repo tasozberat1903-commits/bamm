@@ -1486,127 +1486,130 @@ export function InfoModal({
 
           {/* Modal Content */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 30 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 30 }}
-            className="fixed inset-0 z-[301] flex items-center justify-center p-4 pointer-events-none"
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="fixed inset-0 z-[301] flex items-center justify-center p-4 sm:p-6 pointer-events-none"
           >
-            <div className="bg-[#0A0A0C] w-full max-w-sm rounded-[48px] border border-white/5 shadow-[0_40px_100px_rgba(0,0,0,1)] relative overflow-hidden max-h-[95vh] no-scrollbar pointer-events-auto flex flex-col items-center">
-              {/* Background Accents */}
-              <div className="absolute top-0 left-0 w-full h-[180px] bg-gradient-to-b from-[#AD1519]/20 to-transparent pointer-events-none" />
-              <div className="absolute top-[-50px] right-[-50px] w-48 h-48 bg-bamm-yellow/5 rounded-full blur-[80px] pointer-events-none" />
-              <div className="absolute bottom-[-50px] left-[-50px] w-48 h-48 bg-[#AD1519]/10 rounded-full blur-[80px] pointer-events-none" />
+            <div className="bg-[#111111] w-full max-w-[400px] rounded-[32px] border border-white/10 shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto no-scrollbar pointer-events-auto flex flex-col">
+              
+              {/* Header Image Area */}
+              <div className="relative w-full h-40 bg-zinc-900 border-b border-white/5">
+                <img
+                  src="https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=80&w=800"
+                  alt="BAMM Garden Background"
+                  className="w-full h-full object-cover opacity-60"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#111111] via-[#111111]/50 to-transparent" />
+                
+                {/* Close Button */}
+                <button
+                  onClick={onClose}
+                  className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-black/60 active:scale-95 transition-all border border-white/10 z-20"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-              {/* Close Button */}
-              <button
-                onClick={onClose}
-                className="absolute top-6 right-6 w-11 h-11 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-white/60 active:scale-95 transition-all border border-white/5 z-20"
-              >
-                <X size={20} />
-              </button>
-
-              {/* Top Section / Logo */}
-              <div className="relative pt-12 pb-8 flex flex-col items-center z-10">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-bamm-yellow/20 via-black to-[#AD1519]/20 p-[1px] mb-6 shadow-2xl">
-                  <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden border border-white/5">
+              {/* Profile / Status */}
+              <div className="px-6 relative -mt-12 flex flex-col z-10 mb-6">
+                <div className="w-20 h-20 rounded-2xl bg-[#0A0A0A] p-1 border border-white/10 shadow-xl mb-4">
+                  <div className="w-full h-full rounded-xl bg-black overflow-hidden relative group">
                     <img
                       src="https://i.hizliresim.com/guz3g2u.jpg"
-                      alt="BAMM"
-                      className="w-full h-full object-cover scale-110"
+                      alt="BAMM Logo"
+                      className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                     />
                   </div>
                 </div>
-
-                <div className="text-center px-4">
-                  <h2 className="text-2xl font-black text-white tracking-widest uppercase italic leading-tight mb-2 drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-                    {info.name.split(" & ")[0]}
-                    <span className="text-bamm-yellow"> & </span>
-                    {info.name.split(" & ")[1]}
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight text-white flex justify-between items-start">
+                    {info.name}
                   </h2>
-                  <div className="flex items-center justify-center gap-3">
-                    <div className="h-[1px] w-4 bg-bamm-yellow/40"></div>
-                    <p className="text-bamm-yellow text-[10px] font-black uppercase tracking-[0.4em] mb-0">
-                      {info.tagline}
-                    </p>
-                    <div className="h-[1px] w-4 bg-bamm-yellow/40"></div>
+                  <p className="text-sm text-gray-400 mt-1">{info.tagline}</p>
+                </div>
+                
+                <div className="flex items-center gap-2 mt-4 mt-4">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-xs font-semibold">Açık - 02:00'a kadar</span>
                   </div>
                 </div>
               </div>
 
-              {/* Contact Grid */}
-              <div className="w-full px-6 grid grid-cols-3 gap-4 mb-10 z-10">
-                {[
-                  { icon: Instagram, label: "Instagram", href: `https://instagram.com/${info.instagram.replace("@", "")}`, isExternal: true },
-                  { icon: Phone, label: "Telefon", href: `tel:${info.phone}`, isExternal: false },
-                  { icon: MapPin, label: "Yol Tarifi", href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(info.address)}`, isExternal: true },
-                ].map((action, i) => (
-                  <a
-                    key={i}
-                    href={action.href}
-                    target={action.isExternal ? "_blank" : undefined}
-                    rel={action.isExternal ? "noopener noreferrer" : undefined}
-                    className="flex flex-col items-center gap-3 group"
-                  >
-                    <div className="w-14 h-14 bg-[#151517] border border-white/5 rounded-2xl flex items-center justify-center text-bamm-yellow group-hover:bg-bamm-yellow/10 group-hover:border-bamm-yellow/20 group-active:scale-90 transition-all duration-300 shadow-lg">
-                      <action.icon size={22} strokeWidth={1.5} />
-                    </div>
-                    <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">
-                      {action.label}
-                    </span>
-                  </a>
-                ))}
+              {/* Action Buttons */}
+              <div className="px-6 grid grid-cols-2 gap-3 mb-6">
+                <a
+                  href={`tel:${info.phone}`}
+                  className="flex items-center justify-center gap-2 bg-white text-black py-3 px-4 rounded-xl font-medium text-sm active:scale-95 transition-transform hover:bg-gray-100"
+                >
+                  <Phone size={16} />
+                  <span>Ara</span>
+                </a>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(info.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white py-3 px-4 rounded-xl font-medium text-sm active:scale-95 transition-transform hover:bg-white/10"
+                >
+                  <MapPin size={16} />
+                  <span>Yol Tarifi</span>
+                </a>
               </div>
 
               {/* Details List */}
-              <div className="w-full px-8 space-y-6 mb-12 z-10">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#AD1519]/10 border border-[#AD1519]/20 flex items-center justify-center shrink-0">
-                    <Clock size={16} className="text-[#AD1519]" />
+              <div className="px-6 flex flex-col gap-3 mb-8">
+                {/* Instagram */}
+                <a 
+                  href={`https://instagram.com/${info.instagram.replace("@", "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-400 group-hover:text-pink-400 group-hover:bg-pink-400/10 transition-colors">
+                    <Instagram size={18} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Çalışma Saatleri</span>
-                    <span className="text-[13px] font-bold text-white tracking-tight">{info.hours}</span>
+                    <span className="text-sm font-medium text-white group-hover:text-pink-400 transition-colors">Instagram</span>
+                    <span className="text-xs text-gray-500 mt-0.5">{info.instagram}</span>
+                  </div>
+                </a>
+
+                {/* Hours */}
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-400">
+                    <Clock size={18} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-white">Çalışma Saatleri</span>
+                    <span className="text-xs text-gray-500 mt-0.5">{info.hours}</span>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-bamm-yellow/10 border border-bamm-yellow/20 flex items-center justify-center shrink-0">
-                    <MapPin size={16} className="text-bamm-yellow" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Adres Bilgisi</span>
-                    <span className="text-[13px] font-bold text-white tracking-tight">{info.address}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Wi-Fi Premium Card */}
-              <div className="w-[calc(100%-48px)] mx-6 mb-8 p-6 bg-gradient-to-br from-white/[0.03] to-transparent rounded-[32px] border border-white/10 relative overflow-hidden z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-bamm-yellow/20 flex items-center justify-center">
-                      <Wifi size={16} className="text-bamm-yellow" />
+                {/* WiFi Card */}
+                <div className="flex items-start justify-between gap-4 p-4 rounded-2xl bg-gradient-to-br from-bamm-yellow/10 to-transparent border border-bamm-yellow/20 relative overflow-hidden">
+                  <div className="flex items-center gap-4 relative z-10">
+                    <div className="w-10 h-10 rounded-full bg-bamm-yellow/20 flex items-center justify-center text-bamm-yellow">
+                      <Wifi size={18} />
                     </div>
-                    <span className="text-[11px] font-black text-white uppercase tracking-widest italic">PREMIUM WI-FI</span>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-400 font-medium">Ağ / SSID</span>
+                        <span className="text-sm font-semibold text-white">{info.wifi.ssid}</span>
+                      </div>
+                      <div className="flex flex-col mt-0.5">
+                        <span className="text-[10px] text-gray-400 font-medium">Şifre</span>
+                        <span className="text-sm font-mono text-bamm-yellow">{info.wifi.pass}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                  <div className="absolute right-0 top-0 w-32 h-32 bg-bamm-yellow/10 rounded-full blur-xl pointer-events-none transform translate-x-1/2 -translate-y-1/2" />
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col">
-                    <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em] mb-1">AĞ ADI / SSID</span>
-                    <span className="text-[12px] font-black text-white/90 uppercase tracking-widest truncate">{info.wifi.ssid}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em] mb-1">ŞİFRE / PASSWORD</span>
-                    <span className="text-[12px] font-black text-bamm-yellow tracking-widest truncate">{info.wifi.pass}</span>
-                  </div>
-                </div>
-
-                {/* Aesthetic Detail */}
-                <div className="absolute top-0 right-0 w-24 h-24 bg-bamm-yellow/5 rounded-full blur-2xl pointer-events-none" />
               </div>
+
             </div>
           </motion.div>
         </>

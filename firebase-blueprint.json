@@ -1,38 +1,36 @@
 {
   "entities": {
-    "Interaction": {
-      "title": "Interaction",
-      "description": "A record of an interaction between two tables (e.g., buying a shot).",
+    "MenuItem": {
+      "title": "Menu Item",
+      "description": "An item in the cafe menu",
       "type": "object",
       "properties": {
-        "fromTable": { "type": "integer" },
-        "toTable": { "type": "integer" },
-        "type": { "type": "string", "enum": ["shot", "song", "cheer"] },
-        "message": { "type": "string" },
-        "timestamp": { "type": "integer", "format": "timestamp" }
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "string" },
+        "category": { "type": "string" },
+        "subcategory": { "type": "string" },
+        "image": { "type": "string" },
+        "isPopular": { "type": "boolean" },
+        "deleted": { "type": "boolean" }
       },
-      "required": ["fromTable", "type", "timestamp"]
-    },
-    "Spin": {
-      "title": "Spin",
-      "description": "A record of a wheel spin outcome.",
-      "type": "object",
-      "properties": {
-        "table": { "type": "integer" },
-        "result": { "type": "string" },
-        "timestamp": { "type": "integer", "format": "timestamp" }
-      },
-      "required": ["table", "result", "timestamp"]
+      "required": ["name", "price", "category"]
     }
   },
   "firestore": {
-    "/interactions/{interactionId}": {
-      "schema": "Interaction",
-      "description": "Log of multi-table interactions."
+    "products": {
+      "schema": "MenuItem",
+      "description": "Collection of all menu items"
     },
-    "/spins/{spinId}": {
-      "schema": "Spin",
-      "description": "Log of wheel spin results for the global feed."
+    "admins": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" }
+        }
+      },
+      "description": "Authorized administrators"
     }
   }
 }

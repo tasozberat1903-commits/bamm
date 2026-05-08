@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { auth, db } from "../lib/firebase";
 import {
   signInWithEmailAndPassword,
@@ -13,10 +13,73 @@ import {
   addDoc,
   setDoc,
   doc,
-  deleteDoc,
 } from "firebase/firestore";
 import { CATEGORIES, MENU_DATA, MenuItem } from "../data";
-import { LogOut, Plus, Edit2, Trash2, Nfc, ChevronDown } from "lucide-react";
+import { 
+  LogOut, 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  Nfc, 
+  ChevronDown, 
+  Search, 
+  LayoutDashboard, 
+  Utensils, 
+  Settings, 
+  AlertCircle,
+  CheckCircle2,
+  X,
+  Star,
+  Lock
+} from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 export function AdminPanel() {
   const [user, setUser] = useState<User | null>(null);
@@ -24,8 +87,10 @@ export function AdminPanel() {
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<MenuItem>>({});
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("Tümü");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [nfcStatus, setNfcStatus] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "settings">("products");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -53,6 +118,8 @@ export function AdminPanel() {
       } else {
         setProducts(MENU_DATA);
       }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, "products");
     });
     return unsub;
   }, [user]);
@@ -61,7 +128,7 @@ export function AdminPanel() {
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoginError("");
 
@@ -71,32 +138,23 @@ export function AdminPanel() {
     }
 
     try {
-      // Create a dummy email to use in Firebase Auth
       const dummyEmail = "bamm@admin.com";
-      const dummyPassword = passwordInput + "Secure"; // Passwords must be 6+ chars
+      const dummyPassword = passwordInput + "Secure";
 
       try {
         await signInWithEmailAndPassword(auth, dummyEmail, dummyPassword);
       } catch (signInErr: any) {
         if (signInErr.code === "auth/user-not-found" || signInErr.code === "auth/invalid-credential") {
-          // Attempt to create user
           try {
             await createUserWithEmailAndPassword(auth, dummyEmail, dummyPassword);
           } catch (createErr: any) {
-            if (createErr.code === "auth/operation-not-allowed") {
-              setLoginError("Lütfen Firebase Console'dan 'Email/Password' giriş yöntemini aktif edin.");
-            } else {
-              setLoginError("Kayıt hatası: " + createErr.message);
-            }
+            setLoginError("Sistem hatası. Lütfen daha sonra deneyin.");
           }
-        } else if (signInErr.code === "auth/operation-not-allowed") {
-          setLoginError("Lütfen Firebase Console'dan 'Email/Password' giriş yöntemini aktif edin.");
         } else {
-          setLoginError("Giriş başarısız: " + signInErr.message);
+          setLoginError("Giriş başarısız oldu.");
         }
       }
     } catch (error) {
-      console.error(error);
       setLoginError("Bilinmeyen bir hata oluştu.");
     }
   };
@@ -126,8 +184,7 @@ export function AdminPanel() {
       setIsEditing(null);
       setEditForm({});
     } catch (e) {
-      console.error(e);
-      alert("Kaydedilemedi!");
+      handleFirestoreError(e, OperationType.WRITE, "products");
     }
   };
 
@@ -136,13 +193,8 @@ export function AdminPanel() {
       await setDoc(doc(db, "products", id), { deleted: true }, { merge: true });
       setIsDeleting(null);
     } catch (e) {
-      console.error(e);
-      // alert yerine custom bir hata eklenebilir ama şimdilik konsola yazdıralım.
+      handleFirestoreError(e, OperationType.WRITE, `products/${id}`);
     }
-  };
-
-  const handleDelete = (id: string) => {
-    setIsDeleting(id);
   };
 
   const startEdit = (p: MenuItem) => {
@@ -156,6 +208,7 @@ export function AdminPanel() {
       name: "",
       price: "",
       category: CATEGORIES[0],
+      subcategory: "",
       description: "",
       image: "",
     });
@@ -164,486 +217,517 @@ export function AdminPanel() {
   const writeNfcTag = async () => {
     if ('NDEFReader' in window) {
       try {
-        setNfcStatus("NFC etiketini telefonunuza yaklaştırın...");
+        setNfcStatus("NFC etiketini yaklaştırın...");
         const ndef = new (window as any).NDEFReader();
         await ndef.write({
           records: [{ recordType: "url", data: window.location.origin }]
         });
-        setNfcStatus("NFC etiketine başarıyla yazıldı! ✅");
+        setNfcStatus("Başarıyla yazıldı! ✅");
         setTimeout(() => setNfcStatus(null), 3000);
       } catch (error) {
-        setNfcStatus("NFC yazma hatası: " + error);
+        setNfcStatus("Yazma hatası.");
         setTimeout(() => setNfcStatus(null), 3000);
       }
     } else {
-      setNfcStatus("NFC özelliği bu cihaz/tarayıcı tarafından desteklenmiyor. Lütfen Android Chrome kullanın.");
+      setNfcStatus("NFC desteklenmiyor.");
       setTimeout(() => setNfcStatus(null), 4000);
     }
   };
 
   if (!user) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-bamm-black px-6 text-white text-center">
-        <h1 className="text-2xl font-black italic uppercase mb-2 text-bamm-yellow">
-          Yönetim Paneli
-        </h1>
-        <p className="text-sm text-gray-400 mb-8 max-w-xs">
-          Bu alana sadece yetkili kişiler giriş yapabilir.
-        </p>
-        <form onSubmit={handleLogin} className="flex flex-col gap-4 w-full max-w-xs">
-          <input
-            type="text"
-            placeholder="Kullanıcı Adı"
-            className="px-4 py-3 rounded-xl bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bamm-yellow border border-white/10"
-            value={usernameInput}
-            onChange={(e) => setUsernameInput(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Şifre"
-            className="px-4 py-3 rounded-xl bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bamm-yellow border border-white/10"
-            value={passwordInput}
-            onChange={(e) => setPasswordInput(e.target.value)}
-          />
-          {loginError && (
-            <p className="text-red-400 text-sm mt-1 mb-2">{loginError}</p>
-          )}
-          <button
-            type="submit"
-            className="bg-bamm-yellow text-black px-6 py-3 rounded-xl font-bold uppercase tracking-wider text-sm hover:bg-yellow-400 active:scale-95 transition-all mt-2"
-          >
-            Giriş Yap
-          </button>
-        </form>
+      <div className="flex-1 flex flex-col items-center justify-center bg-[#0F1115] px-6 text-white text-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm bg-[#16191E] p-10 rounded-[40px] border border-white/5 shadow-2xl"
+        >
+          <div className="w-16 h-16 bg-bamm-yellow/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-bamm-yellow/20">
+            <Lock size={28} className="text-bamm-yellow" />
+          </div>
+          <h1 className="text-2xl font-black uppercase mb-2 text-white">Yönetim</h1>
+          <p className="text-sm text-gray-500 mb-8">İşletme sahibi girişi</p>
+          
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <input
+              type="text"
+              placeholder="Kullanıcı Adı"
+              className="px-6 py-4 rounded-2xl bg-black/40 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-bamm-yellow transition-all border border-white/5"
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Şifre"
+              className="px-6 py-4 rounded-2xl bg-black/40 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-bamm-yellow transition-all border border-white/5"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+            />
+            {loginError && (
+              <div className="flex items-center gap-2 text-red-400 text-xs justify-center bg-red-400/10 py-3 rounded-xl border border-red-400/20">
+                <AlertCircle size={14} />
+                {loginError}
+              </div>
+            )}
+            <button
+              type="submit"
+              className="bg-bamm-yellow text-black px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-yellow-400 active:scale-95 transition-all mt-4 shadow-xl shadow-bamm-yellow/10"
+            >
+              Giriş Yap
+            </button>
+          </form>
+        </motion.div>
       </div>
     );
   }
 
+  const filteredProducts = products.filter(p => {
+    const matchesCat = selectedCategoryFilter === "Tümü" || p.category === selectedCategoryFilter;
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         p.category?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
+
   return (
-    <div className="flex-1 bg-[#13151A] text-white overflow-hidden flex flex-col relative w-full h-full xl:max-w-4xl mx-auto shadow-2xl">
-      <div className="flex-shrink-0 px-6 pt-8 pb-6 bg-[#13151A]/80 backdrop-blur-xl z-10 sticky top-0 border-b border-white/5">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex flex-col">
-            <h1 className="text-2xl font-black tracking-widest uppercase text-bamm-yellow drop-shadow-md">
-              Panel
-            </h1>
-            <p className="text-xs text-gray-400 mt-1">
-              Giriş Yapıldı: <span className="text-white">Admin (bamm)</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={writeNfcTag}
-              className="w-10 h-10 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center transition-all duration-300"
-              title="URL'yi NFC Etiketine Yaz"
-            >
-              <Nfc size={18} />
-            </button>
-            <button
-              onClick={handleLogout}
-              className="w-10 h-10 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full flex items-center justify-center transition-all duration-300"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
+    <div className="flex-1 bg-[#0F1115] text-white flex flex-col md:flex-row h-full overflow-hidden relative">
+      {/* Sidebar Navigation - Desktop */}
+      <div className="hidden md:flex w-64 bg-[#16191E] border-r border-white/5 flex-col pt-12 pb-8 shrink-0">
+        <div className="px-6 mb-12">
+          <h1 className="text-xl font-black text-bamm-yellow tracking-tighter uppercase italic">BAMM <span className="text-white">PANEL</span></h1>
         </div>
+        
+        <nav className="flex-1 px-4 space-y-2">
+          {[
+            { id: "dashboard", icon: LayoutDashboard, label: "Hızlı Özet" },
+            { id: "products", icon: Utensils, label: "Ürünler" },
+            { id: "settings", icon: Settings, label: "Sistem" },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id as any)}
+              className={`w-full flex items-center gap-3 px-4 py-4 rounded-2xl transition-all group ${
+                activeTab === item.id 
+                  ? "bg-bamm-yellow text-black font-bold shadow-lg shadow-bamm-yellow/5" 
+                  : "text-gray-500 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <item.icon size={20} />
+              <span className="text-sm">{item.label}</span>
+            </button>
+          ))}
+        </nav>
 
-        {nfcStatus && (
-          <div className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-xl mb-4 text-xs text-center font-bold animate-pulse">
-            {nfcStatus}
-          </div>
-        )}
+        <div className="px-4 mt-auto">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl text-red-500 hover:bg-red-500/10 transition-all font-medium"
+          >
+            <LogOut size={20} />
+            <span className="text-sm">Çıkış Yap</span>
+          </button>
+        </div>
+      </div>
 
-        <button
-          onClick={startNew}
-          className="w-full bg-bamm-yellow hover:bg-yellow-400 text-bamm-black font-black uppercase text-sm py-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,204,0,0.2)] transition-all duration-300 active:scale-[0.98]"
-        >
-          <Plus size={20} /> Yeni Ürün Ekle
+      {/* Bottom Navigation - Mobile */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#16191E]/80 backdrop-blur-xl border-t border-white/5 px-4 py-3 flex items-center justify-around">
+        {[
+          { id: "dashboard", icon: LayoutDashboard, label: "Özet" },
+          { id: "products", icon: Utensils, label: "Ürünler" },
+          { id: "settings", icon: Settings, label: "Ayarlar" },
+        ].map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id as any)}
+            className={`flex flex-col items-center gap-1 transition-all ${
+              activeTab === item.id ? "text-bamm-yellow" : "text-gray-500"
+            }`}
+          >
+            <item.icon size={20} />
+            <span className="text-[10px] font-bold uppercase tracking-wider">{item.label}</span>
+          </button>
+        ))}
+        <button onClick={handleLogout} className="flex flex-col items-center gap-1 text-red-500">
+          <LogOut size={20} />
+          <span className="text-[10px] font-bold uppercase tracking-wider">Çıkış</span>
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-24 pt-4">
-        <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-2">
-          {["Tümü", ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))].map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategoryFilter(cat)}
-              className={`px-5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-300 ${
-                selectedCategoryFilter === cat
-                  ? "bg-bamm-yellow text-bamm-black shadow-[0_4px_10px_rgba(255,215,0,0.2)]"
-                  : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-0">
+        {activeTab === "products" && (
+          <div className="p-4 md:p-12">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-black text-white mb-2 uppercase tracking-tighter italic">Ürün Yönetimi</h1>
+                <p className="text-gray-500 text-xs md:text-sm">Menüdeki tüm içerikleri buradan kontrol edin.</p>
+              </div>
+              <button
+                onClick={startNew}
+                className="bg-white text-black px-6 md:px-8 py-3 md:py-4 rounded-2xl font-black uppercase text-[10px] md:text-xs flex items-center justify-center gap-2 hover:bg-gray-200 active:scale-95 transition-all shadow-xl"
+              >
+                <Plus size={18} /> Yeni Ürün Ekle
+              </button>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(selectedCategoryFilter === "Tümü" ? products : products.filter(p => p.category === selectedCategoryFilter)).map((p) => (
-            <div
-              key={p.id}
-              className="group bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 p-4 rounded-3xl flex items-center gap-4 hover:border-white/20 transition-all duration-300 relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-bamm-yellow/0 via-bamm-yellow/0 to-bamm-yellow/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-              <div className="w-16 h-16 bg-black/50 rounded-2xl overflow-hidden shrink-0 shadow-inner flex items-center justify-center">
-                {p.image ? (
-                  <img
-                    src={p.image}
-                    alt={p.name}
-                    className="w-full h-full object-cover"
+            {/* Quick Stats Bar */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-8 md:mb-10">
+              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5">
+                <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Toplam</p>
+                <h4 className="text-xl md:text-2xl font-black text-white">{products.length}</h4>
+              </div>
+              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5">
+                <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Kategori</p>
+                <h4 className="text-xl md:text-2xl font-black text-bamm-yellow">{Array.from(new Set(products.map(p => p.category))).length}</h4>
+              </div>
+              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 col-span-2 md:col-span-1">
+                <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Popüler</p>
+                <h4 className="text-xl md:text-2xl font-black text-green-400">{products.filter(p => p.isPopular).length}</h4>
+              </div>
+            </div>
+
+            <div className="bg-[#16191E] rounded-3xl md:rounded-[40px] border border-white/5 overflow-hidden shadow-2xl">
+              {/* Toolbar */}
+              <div className="p-4 md:p-6 border-b border-white/5 flex flex-col md:flex-row gap-4 items-center justify-between bg-white/[0.01]">
+                <div className="flex gap-2 p-1 bg-black/40 rounded-2xl overflow-x-auto no-scrollbar w-full md:w-auto">
+                  {["Tümü", ...CATEGORIES.filter(c => products.some(p => p.category === c))].map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategoryFilter(cat)}
+                      className={`px-4 md:px-6 py-2 rounded-xl text-[10px] md:text-xs font-bold whitespace-nowrap transition-all ${
+                        selectedCategoryFilter === cat 
+                          ? "bg-white text-black shadow-lg scale-105" 
+                          : "text-gray-500 hover:text-white"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative w-full md:w-64">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Ürün Ara..."
+                    className="w-full bg-black/40 border-none rounded-xl md:rounded-2xl py-3 pl-10 md:pl-12 pr-4 text-xs md:text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                ) : (
-                  <span className="text-xs font-bold uppercase text-white/20">{p.name.substring(0, 2)}</span>
+                </div>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block p-4 overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
+                      <th className="px-6 py-4">Ürün Detayı</th>
+                      <th className="px-6 py-4">Kategori</th>
+                      <th className="px-6 py-4">Fiyat</th>
+                      <th className="px-6 py-4 text-right">Düzenle</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {filteredProducts.map((p) => (
+                      <tr key={p.id} className="group hover:bg-white/[0.02] transition-colors">
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-black rounded-xl overflow-hidden shrink-0 border border-white/10 p-0.5">
+                              {p.image ? (
+                                <img src={p.image} className="w-full h-full object-cover rounded-lg" alt="" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-white/20 font-black text-xs uppercase">{p.name.substring(0, 2)}</div>
+                              )}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-white flex items-center gap-2">
+                                {p.name}
+                                {p.isPopular && <Star size={12} className="text-bamm-yellow fill-bamm-yellow" />}
+                              </span>
+                              <span className="text-xs text-gray-500 truncate max-w-[200px]">{p.description || "Açıklama yok"}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex flex-col gap-1">
+                            <span className="px-3 py-1 bg-white/5 rounded-full text-[10px] font-bold text-gray-400 uppercase tracking-widest w-fit">{p.category}</span>
+                            {p.subcategory && (
+                              <span className="text-[9px] font-medium text-gray-600 uppercase tracking-wider pl-1">{p.subcategory}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-5 font-black text-bamm-yellow text-sm">
+                          {p.price}
+                        </td>
+                        <td className="px-6 py-5 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => startEdit(p)} className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-white transition-all"><Edit2 size={14} /></button>
+                            <button onClick={() => setIsDeleting(p.id)} className="w-9 h-9 flex items-center justify-center bg-red-400/10 hover:bg-red-400/20 rounded-xl text-red-400 transition-all"><Trash2 size={14} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-white/5">
+                 {filteredProducts.map((p) => (
+                   <div key={p.id} className="p-5 flex items-center gap-4 active:bg-white/5 transition-colors">
+                      <div className="w-14 h-14 bg-black rounded-xl overflow-hidden shrink-0 border border-white/10">
+                        {p.image ? (
+                          <img src={p.image} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-white/20 font-black text-[10px] uppercase">{p.name.substring(0, 2)}</div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <h4 className="text-xs font-bold text-white truncate uppercase tracking-tight">{p.name}</h4>
+                          {p.isPopular && <Star size={10} className="text-bamm-yellow fill-bamm-yellow" />}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-bamm-yellow">{p.price}</span>
+                          <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest leading-none border-l border-white/10 pl-2">
+                            {p.subcategory ? `${p.category} / ${p.subcategory}` : p.category}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button onClick={() => startEdit(p)} className="w-10 h-10 flex items-center justify-center bg-white/5 rounded-xl text-white"><Edit2 size={14} /></button>
+                        <button onClick={() => setIsDeleting(p.id)} className="w-10 h-10 flex items-center justify-center bg-red-400/10 rounded-xl text-red-400"><Trash2 size={14} /></button>
+                      </div>
+                   </div>
+                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "dashboard" && (
+          <div className="p-4 md:p-12">
+            <h1 className="text-2xl md:text-3xl font-black text-white mb-2 uppercase tracking-tighter italic leading-none">Hoş Geldiniz,<br className="md:hidden" /> <span className="text-bamm-yellow">BAMM!</span></h1>
+            <p className="text-gray-500 text-xs md:text-sm mb-8 md:mb-12">İşletmenizin performansına kısa bir bakış.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+              <div className="bg-[#16191E] p-6 md:p-10 rounded-3xl md:rounded-[48px] border border-white/5 shadow-xl">
+                <h3 className="font-bold text-white mb-4 text-sm md:text-base">Sistem Durumu</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-xs md:text-sm py-3 border-b border-white/5">
+                    <span className="text-gray-400">Veritabanı</span>
+                    <span className="text-green-400 font-bold">Aktif</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs md:text-sm py-3 border-b border-white/5">
+                    <span className="text-gray-400">Görüntüleme</span>
+                    <span className="text-white font-bold">1,240</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs md:text-sm py-3 border-b border-white/5">
+                    <span className="text-gray-400">Versiyon</span>
+                    <span className="text-gray-600">v2.1.0</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-bamm-yellow p-6 md:p-10 rounded-3xl md:rounded-[48px] shadow-xl shadow-bamm-yellow/5">
+                <h3 className="font-black text-black mb-4 uppercase tracking-wider text-sm md:text-base">Duyuru</h3>
+                <p className="text-black/70 text-xs md:text-sm leading-relaxed font-medium">
+                  Menüdeki fiyatları güncelledikten sonra NFC etiketlerini kontrol etmeyi unutmayın. 
+                  Bir sonraki güncellemede sipariş takip sistemi eklenecektir.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "settings" && (
+          <div className="p-4 md:p-12 max-w-2xl">
+            <h1 className="text-2xl md:text-3xl font-black text-white mb-2 uppercase tracking-tighter italic">Sistem Araçları</h1>
+            <p className="text-gray-500 text-xs md:text-sm mb-8 md:mb-12">Dijital menü yönetim ayarları</p>
+
+            <div className="space-y-6">
+              <div className="bg-[#16191E] p-6 md:p-8 rounded-3xl md:rounded-[40px] border border-white/5 shadow-xl">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400"><Nfc size={24} /></div>
+                  <div>
+                    <h3 className="font-bold text-white text-sm md:text-base">NFC Yapılandırma</h3>
+                    <p className="text-[10px] md:text-xs text-gray-500">Müşteri etiketlerini menüye yönlendir</p>
+                  </div>
+                </div>
+                <button
+                  onClick={writeNfcTag}
+                  className="w-full bg-blue-600 hover:bg-blue-700 py-3 md:py-4 rounded-xl md:rounded-2xl font-bold text-[10px] md:text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-blue-600/10"
+                >
+                  Linki NFC'ye Tanımla
+                </button>
+                {nfcStatus && (
+                  <div className="mt-4 p-3 rounded-xl bg-blue-400/10 border border-blue-400/20 text-blue-300 text-[10px] text-center font-bold">
+                    {nfcStatus}
+                  </div>
                 )}
               </div>
-              <div className="flex-1 min-w-0 pr-2">
-                <h3 className="font-bold text-base text-white truncate mb-1">{p.name}</h3>
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <span className="bg-white/10 px-2 py-0.5 rounded-full text-white/80 whitespace-nowrap overflow-hidden text-ellipsis">{p.category}</span>
-                  <span className="text-bamm-yellow font-medium whitespace-nowrap shrink-0">{p.price}</span>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 relative z-10 shrink-0">
-                <button
-                  onClick={() => startEdit(p)}
-                  className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
-                >
-                  <Edit2 size={14} />
-                </button>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  className="w-8 h-8 flex items-center justify-center bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
-      {isEditing && (
-        <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsEditing(null)} />
-          <div className="relative bg-[#1A1C21] rounded-t-[40px] p-6 pb-12 w-full max-w-2xl mx-auto shadow-[0_-20px_40px_rgba(0,0,0,0.5)] border-t border-white/10 flex flex-col max-h-[90vh]">
-            <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 shrink-0" />
-            
-            <h2 className="text-2xl font-black text-white mb-6 uppercase tracking-wide shrink-0">
-              {isEditing === "new" ? "Yeni Ürün" : "Ürünü Düzenle"}
-            </h2>
-            
-            <div className="space-y-5 overflow-y-auto no-scrollbar pr-2 pb-6">
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Ürün Adı</label>
-                <input
-                  type="text"
-                  placeholder="Ürün Adı"
-                  value={editForm.name || ""}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors placeholder:text-gray-600"
-                />
+      {/* Edit/Add Side Panel */}
+      <AnimatePresence>
+        {isEditing && (
+          <div className="fixed inset-0 z-[100] flex justify-end">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md" 
+              onClick={() => setIsEditing(null)} 
+            />
+            <motion.div 
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="relative bg-[#16191E] w-full md:w-[480px] h-full shadow-2xl border-l border-white/5 flex flex-col p-6 md:p-12"
+            >
+              <div className="flex items-center justify-between mb-8 md:mb-10">
+                <h2 className="text-xl md:text-3xl font-black text-white uppercase tracking-tighter italic">
+                  {isEditing === "new" ? "Yeni Ürün" : "Düzenle"}
+                </h2>
+                <button onClick={() => setIsEditing(null)} className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-colors border border-white/10">
+                  <X size={18} />
+                </button>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Fiyat</label>
-                <input
-                  type="text"
-                  placeholder="örn: 420 TL"
-                  value={editForm.price || ""}
-                  onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors placeholder:text-gray-600"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Kategori</label>
-                <div className="relative">
-                  <select
-                    value={editForm.category || ""}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      let defaultSubcategory;
-                      if (val === "Kokteyller") defaultSubcategory = "İmza Kokteylleri";
-                      else if (val === "Biralar") defaultSubcategory = "Fıçı Biralar";
-                      else if (val === "Kampanyalar") defaultSubcategory = "1+1";
-                      else if (val === "Yemekler") defaultSubcategory = "Beyaz Etler";
-                      else if (val === "Kahvaltı") defaultSubcategory = "Breakfast";
-                      else if (val === "Kadeh") defaultSubcategory = "Vodka";
-                      else if (val === "Şişeler") defaultSubcategory = "Vodka";
-                      else if (val === "Şarap") defaultSubcategory = "Kadeh";
-
-                      setEditForm({
-                        ...editForm,
-                        category: val,
-                        subcategory: defaultSubcategory
-                      });
-                    }}
-                    className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
-                  >
-                    <option value="" disabled className="text-gray-500">Seçiniz</option>
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c} className="text-black">{c}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                </div>
-              </div>
-
-              {editForm.category === "Kokteyller" && (
+              <div className="flex-1 overflow-y-auto no-scrollbar space-y-5 md:space-y-6 pb-20 md:pb-8 pr-1">
                 <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <div className="relative">
-                    <select
-                      value={editForm.subcategory || "İmza Kokteylleri"}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, subcategory: e.target.value })
-                      }
-                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
-                    >
-                      <option value="İmza Kokteylleri" className="text-black">İmza Kokteylleri</option>
-                      <option value="Dünya Klasikleri" className="text-black">Dünya Klasikleri</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
+                  <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Ürün İsmi</label>
+                  <input
+                    type="text"
+                    placeholder="Örn: Bamm Special"
+                    value={editForm.name || ""}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                  />
                 </div>
-              )}
 
-              {editForm.category === "Biralar" && (
                 <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <div className="relative">
-                    <select
-                      value={editForm.subcategory || "Fıçı Biralar"}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, subcategory: e.target.value })
-                      }
-                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
-                    >
-                      <option value="Fıçı Biralar" className="text-black">Fıçı Biralar</option>
-                      <option value="Şişe Biralar" className="text-black">Şişe Biralar</option>
-                      <option value="Kova Biralar" className="text-black">Kova Biralar</option>
-                      <option value="İthal Biralar" className="text-black">İthal Biralar</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-
-              {editForm.category === "Kampanyalar" && (
-                <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <div className="relative">
-                    <select
-                      value={editForm.subcategory || "1+1"}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, subcategory: e.target.value })
-                      }
-                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
-                    >
-                      <option value="1+1" className="text-black">1+1</option>
-                      <option value="Şarap" className="text-black">Şarap</option>
-                      <option value="Shoot" className="text-black">Shoot</option>
-                      <option value="Fıçı Kampanya" className="text-black">Fıçı Kampanya</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-
-              {editForm.category === "Kadeh" && (
-                <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <div className="relative">
-                    <select
-                      value={editForm.subcategory || "Vodka"}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, subcategory: e.target.value })
-                      }
-                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
-                    >
-                      <option value="Vodka" className="text-black">Vodka</option>
-                      <option value="Gin" className="text-black">Gin</option>
-                      <option value="Rakı" className="text-black">Rakı</option>
-                      <option value="Viski" className="text-black">Viski</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-
-              {editForm.category === "Şişeler" && (
-                <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <div className="relative">
-                    <select
-                      value={editForm.subcategory || "Vodka"}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, subcategory: e.target.value })
-                      }
-                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
-                    >
-                      <option value="Vodka" className="text-black">Vodka</option>
-                      <option value="Gin" className="text-black">Gin</option>
-                      <option value="Tekila" className="text-black">Tekila</option>
-                      <option value="Rakı" className="text-black">Rakı</option>
-                      <option value="Şarap" className="text-black">Şarap</option>
-                      <option value="Viski" className="text-black">Viski</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-
-              {editForm.category === "Şarap" && (
-                <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <div className="relative">
-                    <select
-                      value={editForm.subcategory || "Kadeh"}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, subcategory: e.target.value })
-                      }
-                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
-                    >
-                      <option value="Kadeh" className="text-black">Kadeh</option>
-                      <option value="Şişeler" className="text-black">Şişeler</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-
-              {editForm.category === "Yemekler" && (
-                <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <div className="relative">
-                    <select
-                      value={editForm.subcategory || "Beyaz Etler"}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, subcategory: e.target.value })
-                      }
-                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
-                    >
-                      <option value="Beyaz Etler" className="text-black">Beyaz Etler</option>
-                      <option value="Kırmızı Etler" className="text-black">Kırmızı Etler</option>
-                      <option value="Burgerler" className="text-black">Burgerler</option>
-                      <option value="Wrapler" className="text-black">Wrapler</option>
-                      <option value="Makarnalar" className="text-black">Makarnalar</option>
-                      <option value="Pizzalar" className="text-black">Pizzalar</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-
-              {editForm.category === "Kahvaltı" && (
-                <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Alt Kategori</label>
-                  <div className="relative">
-                    <select
-                      value={editForm.subcategory || "Breakfast"}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, subcategory: e.target.value })
-                      }
-                      className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors appearance-none pr-12 cursor-pointer"
-                    >
-                      <option value="Breakfast" className="text-black">Breakfast</option>
-                      <option value="Omletler" className="text-black">Omletler</option>
-                      <option value="Sahanda" className="text-black">Sahanda</option>
-                      <option value="Tostlar" className="text-black">Tostlar</option>
-                      <option value="Kahvaltı Yanı" className="text-black">Kahvaltı Yanı</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Açıklama</label>
-                <textarea
-                  placeholder="İçindekiler vs."
-                  value={editForm.description || ""}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors h-28 placeholder:text-gray-600"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block pl-1">Görsel URL</label>
-                <input
-                  type="text"
-                  placeholder="https://..."
-                  value={editForm.image || ""}
-                  onChange={(e) => setEditForm({ ...editForm, image: e.target.value })}
-                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-bamm-yellow transition-colors placeholder:text-gray-600"
-                />
-              </div>
-
-              <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                <label className="flex items-center gap-3 text-sm text-white font-medium cursor-pointer">
-                  <div className="relative flex items-center">
+                  <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Görsel URL</label>
+                  <div className="flex gap-3">
                     <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={editForm.isPopular || false}
-                      onChange={(e) => setEditForm({ ...editForm, isPopular: e.target.checked })}
+                      type="text"
+                      placeholder="https://gorsel-linki.com/resim.jpg"
+                      value={editForm.image || ""}
+                      onChange={(e) => setEditForm({ ...editForm, image: e.target.value })}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
                     />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bamm-yellow"></div>
+                    {editForm.image && (
+                      <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl border border-white/10 overflow-hidden bg-black shrink-0">
+                        <img src={editForm.image} className="w-full h-full object-cover" alt="Önizleme" />
+                      </div>
+                    )}
                   </div>
-                  Popüler (Yıldızlı Ürün)
-                </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <div>
+                    <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Fiyat</label>
+                    <input
+                      type="text"
+                      placeholder="150₺"
+                      value={editForm.price || ""}
+                      onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Kategori</label>
+                    <div className="relative">
+                      <select
+                        value={editForm.category || ""}
+                        onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white appearance-none cursor-pointer focus:ring-1 focus:ring-bamm-yellow"
+                      >
+                        {CATEGORIES.map(c => <option key={c} value={c} className="text-black">{c}</option>)}
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                   <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Alt Kategori (Opsiyonel)</label>
+                   <input
+                     type="text"
+                     placeholder="Örn: Burgerler, Sıcak Kokteyller"
+                     value={editForm.subcategory || ""}
+                     onChange={(e) => setEditForm({ ...editForm, subcategory: e.target.value })}
+                     className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                   />
+                </div>
+
+                <div>
+                  <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Açıklama</label>
+                  <textarea
+                    value={editForm.description || ""}
+                    rows={3}
+                    placeholder="Ürün içeriğini buraya yazın..."
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow resize-none"
+                  />
+                </div>
+
+                <div className="p-5 md:p-8 bg-white/[0.02] rounded-2xl md:rounded-[32px] border border-white/5 flex items-center justify-between group">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center border transition-all ${
+                      editForm.isPopular ? "bg-bamm-yellow/20 border-bamm-yellow/40 text-bamm-yellow" : "bg-white/5 border-white/5 text-gray-600"
+                    }`}>
+                      <Star size={18} className={editForm.isPopular ? "fill-bamm-yellow" : ""} />
+                    </div>
+                    <div>
+                      <span className="text-sm md:text-base font-bold block">Popüler?</span>
+                      <span className="text-[10px] md:text-xs text-gray-500">Ana sayfada öne çıkar.</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setEditForm({ ...editForm, isPopular: !editForm.isPopular })}
+                    className={`w-12 h-7 md:w-14 md:h-8 rounded-full relative transition-all ${
+                      editForm.isPopular ? "bg-bamm-yellow" : "bg-white/10"
+                    }`}
+                  >
+                    <div className={`absolute top-1 w-5 h-5 md:w-6 md:h-6 rounded-full bg-white transition-all shadow-md ${
+                      editForm.isPopular ? "left-6 md:left-7" : "left-1"
+                    }`} />
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div className="flex gap-4 pt-6 shrink-0 mt-auto border-t border-white/5">
-              <button
-                onClick={() => setIsEditing(null)}
-                className="flex-1 bg-white/5 hover:bg-white/10 py-4 rounded-2xl font-bold uppercase tracking-wider text-sm transition-colors"
-              >
-                İptal
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex-1 bg-bamm-yellow hover:bg-yellow-400 text-bamm-black py-4 rounded-2xl font-black uppercase tracking-wider text-sm shadow-xl transition-all active:scale-95"
-              >
-                Kaydet
-              </button>
-            </div>
+              <div className="fixed md:relative bottom-4 left-4 right-4 md:bottom-0 md:left-0 md:right-0 flex gap-4 mt-auto">
+                <button
+                  onClick={handleSave}
+                  className="flex-1 bg-bamm-yellow text-black py-4 md:py-5 rounded-xl md:rounded-2xl font-black uppercase text-[11px] md:text-[13px] tracking-widest active:scale-95 transition-all shadow-xl shadow-bamm-yellow/10"
+                >
+                  Değişiklikleri Kaydet
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
-      {isDeleting && (
-        <div className="fixed inset-0 z-[110] flex flex-col justify-center items-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsDeleting(null)} />
-          <div className="relative bg-[#1A1C21] rounded-[32px] p-8 w-full max-w-sm mx-4 shadow-[0_20px_40px_rgba(0,0,0,0.5)] border border-white/10 flex flex-col items-center text-center">
-            <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6">
-              <Trash2 size={24} />
-            </div>
-            <h2 className="text-xl font-black text-white mb-2 uppercase tracking-wide">
-              Emin Misiniz?
-            </h2>
-            <p className="text-sm text-gray-400 mb-8">
-              Bu ürünü silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
-            </p>
-            <div className="flex gap-4 w-full">
-              <button
-                onClick={() => setIsDeleting(null)}
-                className="flex-1 bg-white/5 hover:bg-white/10 py-3.5 rounded-2xl font-bold text-sm transition-colors text-white"
-              >
-                İptal
-              </button>
-              <button
-                onClick={() => confirmDelete(isDeleting)}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3.5 rounded-2xl font-black text-sm shadow-lg shadow-red-500/20 transition-all active:scale-95"
-              >
-                Evet, Sil
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
+      {/* Delete Confirmation */}
+      <AnimatePresence>
+        {isDeleting && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setIsDeleting(null)} />
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative bg-[#1A1D23] p-10 rounded-[48px] border border-white/10 shadow-2xl w-full max-w-sm text-center">
+              <div className="w-20 h-20 bg-red-500/10 rounded-[32px] flex items-center justify-center mx-auto mb-8 text-red-500"><Trash2 size={32} /></div>
+              <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter italic leading-none">Silmek<br />İstediniz Mi?</h2>
+              <p className="text-sm text-gray-500 mb-10">Bu işlemi geri alamazsınız.</p>
+              <div className="flex flex-col gap-3">
+                <button onClick={() => confirmDelete(isDeleting)} className="w-full bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-red-500/20 active:scale-95 transition-all">Evet, Sil</button>
+                <button onClick={() => setIsDeleting(null)} className="w-full bg-white/5 text-gray-400 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:text-white transition-colors">Vazgeç</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
