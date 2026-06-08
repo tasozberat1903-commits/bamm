@@ -742,6 +742,7 @@ const CATEGORY_ICONS: Record<string, any> = {
   "Alkolsüz Kokteyller": CupSoda,
   Kampanyalar: BadgePercent,
   Biralar: Beer,
+  Shotlar: Flame,
   "Sıcak İçecekler": Coffee,
   "Soğuk İçecekler": CupSoda,
   "Soft İçecekler": CupSoda,
@@ -758,6 +759,7 @@ const CATEGORY_DESCS: Record<string, string> = {
   Kahvaltı: "Güne güzel başla",
   Kokteyller: "İmza ve klasik lezzetler",
   Biralar: "Fıçı ve şişe biralar",
+  Shotlar: "Çeşitli alkollü shot seçenekleri",
 };
 const getCategoryDescription = (cat: string) => CATEGORY_DESCS[cat] || "Bamm Garden Lezzetleri";
 
@@ -772,6 +774,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   "Alkolsüz Kokteyller": "ALKOLSÜZ",
   Kampanyalar: "KAMPANYA",
   Biralar: "BİRA",
+  Shotlar: "SHOTLAR",
   "Sıcak İçecekler": "SICAK",
   "Soğuk İçecekler": "SOĞUK",
   "Soft İçecekler": "SOFT",
@@ -782,6 +785,7 @@ const CATEGORY_ORDER = [
   "Kampanyalar",
   "Biralar",
   "Kokteyller",
+  "Shotlar",
   "Yemekler",
   "Popüler",
   "Atıştırmalıklar",
@@ -886,7 +890,7 @@ export function MenuSection({
         : item.category === selectedCategory;
 
     let matchesSubcategory = true;
-    if ((selectedCategory === "Kokteyller" || selectedCategory === "Alkolsüz Kokteyller" || selectedCategory === "Biralar" || selectedCategory === "Kampanyalar" || selectedCategory === "Yemekler" || selectedCategory === "Kahvaltı" || selectedCategory === "Kadeh" || selectedCategory === "Şişeler" || selectedCategory === "Şarap" || selectedCategory === "Tatlılar" || selectedCategory === "Çaylar") && selectedSubcategory !== "Tümü") {
+    if ((selectedCategory === "Kokteyller" || selectedCategory === "Alkolsüz Kokteyller" || selectedCategory === "Biralar" || selectedCategory === "Kampanyalar" || selectedCategory === "Yemekler" || selectedCategory === "Kahvaltı" || selectedCategory === "Kadeh" || selectedCategory === "Şişeler" || selectedCategory === "Şarap" || selectedCategory === "Tatlılar" || selectedCategory === "Çaylar" || selectedCategory === "Shotlar") && selectedSubcategory !== "Tümü") {
       matchesSubcategory = item.subcategory === selectedSubcategory;
     }
 
@@ -1279,77 +1283,194 @@ export function MenuSection({
           </div>
         )}
 
+        {selectedCategory === "Shotlar" && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
+            {["Tümü", "Vodka Shotlar", "Likör Shotlar", "Cin Shotlar", "Tekila Shotlar", "Viski Shotlar"].map((subcat) => (
+              <button
+                key={subcat}
+                onClick={() => setSelectedSubcategory(subcat)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
+                  selectedSubcategory === subcat
+                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {subcat === "Tümü" && <ListFilter size={16} />}
+                {subcat}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Product List - Horizontal Cards */}
         <div className="bg-[#F8F9FA] flex-1 rounded-t-[40px] px-6 pt-8 pb-32 shadow-[0_-10px_20px_rgba(0,0,0,0.03)] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 space-y-0 align-start items-start content-start">
           <AnimatePresence mode="popLayout">
-            {filteredItems.map((item, idx) => {
-              const ItemIcon = CATEGORY_ICONS[item.category] || Utensils;
+            {selectedCategory === "Shotlar" ? (
+              // If it's Shotlar, group them by subcategory
+              (() => {
+                const subcats = selectedSubcategory === "Tümü"
+                  ? ["Vodka Shotlar", "Likör Shotlar", "Cin Shotlar", "Tekila Shotlar", "Viski Shotlar"]
+                  : [selectedSubcategory];
 
-              return (
-                <motion.div
-                  layout
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: idx * 0.03 }}
-                  key={item.id}
-                  onClick={() => onProductClick(item)}
-                  className="bg-white rounded-[32px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-black/[0.04] flex items-center gap-5 relative group active:scale-[0.98] transition-all cursor-pointer overflow-hidden"
-                >
-                  <div className="absolute right-0 top-0 w-32 h-32 bg-gray-50 rounded-full blur-[40px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                return subcats.map((subcat) => {
+                  const subcatItems = filteredItems.filter(item => item.subcategory === subcat);
+                  if (subcatItems.length === 0) return null;
 
-                  <div className="w-[68px] h-[68px] rounded-[24px] bg-gray-50 flex-shrink-0 flex items-center justify-center relative border border-black/[0.02] group-hover:scale-105 group-hover:shadow-[0_8px_16px_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden">
-                    {item.image ? (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <ItemIcon
-                        size={28}
-                        className="text-gray-400 group-hover:text-black transition-colors"
-                        strokeWidth={1.5}
-                      />
-                    )}
-
-                    {item.isPopular && (
-                      <div className="absolute -top-2 -right-2 bg-bamm-yellow text-black p-1.5 rounded-xl shadow-sm rotate-12 group-hover:rotate-0 transition-transform">
-                        <Star size={10} fill="currentColor" />
+                  return (
+                    <div key={subcat} className="col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 align-start items-start content-start">
+                      {/* Subcategory title banner */}
+                      <div className="col-span-full pt-6 pb-2 border-b border-gray-200/50 flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-widest text-[#B49E72] bg-[#FFF8D6] px-4 py-1.5 rounded-full">
+                          {subcat}
+                        </span>
+                        <div className="h-[2px] bg-gray-100 flex-1 mx-4"></div>
+                        <span className="text-[11px] text-gray-400 font-extrabold tracking-wide uppercase">
+                          {subcatItems.length} Çeşit
+                        </span>
                       </div>
-                    )}
-                  </div>
 
-                  <div className="flex-1 min-w-0 flex flex-col justify-center pb-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md">
-                        {CATEGORY_LABELS[item.category] || item.category}
-                      </span>
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900 leading-tight mb-2 pr-4">
-                      {item.name}
-                    </h3>
-                    <p className="text-[11px] text-gray-500 line-clamp-1 leading-relaxed max-w-[90%]">
-                      {item.description}
-                    </p>
-                  </div>
+                      {subcatItems.map((item, idx) => {
+                        const ItemIcon = CATEGORY_ICONS[item.category] || Utensils;
+                        return (
+                          <motion.div
+                            layout
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ delay: idx * 0.03 }}
+                            key={item.id}
+                            onClick={() => onProductClick(item)}
+                            className="bg-white rounded-[32px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-black/[0.04] flex items-center gap-5 relative group active:scale-[0.98] transition-all cursor-pointer overflow-hidden"
+                          >
+                            <div className="absolute right-0 top-0 w-32 h-32 bg-gray-50 rounded-full blur-[40px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-                  <div className="flex flex-col items-end gap-3 pl-2 relative z-10 flex-shrink-0">
-                    <div className="flex items-baseline gap-0.5">
-                      <span className="text-[22px] font-black text-gray-900 tracking-tighter">
-                        {item.price.replace(/ TL|₺/g, "")}
-                      </span>
-                      <span className="text-[10px] font-bold text-gray-400">
-                        TL
-                      </span>
+                            <div className="w-[68px] h-[68px] rounded-[24px] bg-gray-50 flex-shrink-0 flex items-center justify-center relative border border-black/[0.02] group-hover:scale-105 group-hover:shadow-[0_8px_16px_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden">
+                              {item.image ? (
+                                <img
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <ItemIcon
+                                  size={28}
+                                  className="text-gray-400 group-hover:text-black transition-colors"
+                                  strokeWidth={1.5}
+                                />
+                              )}
+
+                              {item.isPopular && (
+                                <div className="absolute -top-2 -right-2 bg-bamm-yellow text-black p-1.5 rounded-xl shadow-sm rotate-12 group-hover:rotate-0 transition-transform">
+                                  <Star size={10} fill="currentColor" />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0 flex flex-col justify-center pb-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#B49E72] bg-[#FFF8D6]/30 px-2 py-0.5 rounded-md">
+                                  {subcat}
+                                </span>
+                              </div>
+                              <h3 className="text-base font-bold text-gray-900 leading-tight mb-2 pr-4">
+                                {item.name}
+                              </h3>
+                              <p className="text-[11px] text-gray-500 line-clamp-1 leading-relaxed max-w-[90%]">
+                                {item.description}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-col items-end gap-3 pl-2 relative z-10 flex-shrink-0">
+                              <div className="flex items-baseline gap-0.5">
+                                <span className="text-[22px] font-black text-gray-900 tracking-tighter">
+                                  {item.price.replace(/ TL|₺/g, "")}
+                                </span>
+                                <span className="text-[10px] font-bold text-gray-400">
+                                  TL
+                                </span>
+                              </div>
+                              <div className="w-10 h-10 bg-black text-white rounded-2xl flex items-center justify-center shadow-md opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 absolute -right-2 bottom-0">
+                                <ChevronRight size={20} />
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
-                    <div className="w-10 h-10 bg-black text-white rounded-2xl flex items-center justify-center shadow-md opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 absolute -right-2 bottom-0">
-                      <ChevronRight size={20} />
+                  );
+                });
+              })()
+            ) : (
+              // Otherwise, render normally
+              filteredItems.map((item, idx) => {
+                const ItemIcon = CATEGORY_ICONS[item.category] || Utensils;
+
+                return (
+                  <motion.div
+                    layout
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: idx * 0.03 }}
+                    key={item.id}
+                    onClick={() => onProductClick(item)}
+                    className="bg-white rounded-[32px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-black/[0.04] flex items-center gap-5 relative group active:scale-[0.98] transition-all cursor-pointer overflow-hidden"
+                  >
+                    <div className="absolute right-0 top-0 w-32 h-32 bg-gray-50 rounded-full blur-[40px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
+                    <div className="w-[68px] h-[68px] rounded-[24px] bg-gray-50 flex-shrink-0 flex items-center justify-center relative border border-black/[0.02] group-hover:scale-105 group-hover:shadow-[0_8px_16px_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ItemIcon
+                          size={28}
+                          className="text-gray-400 group-hover:text-black transition-colors"
+                          strokeWidth={1.5}
+                        />
+                      )}
+
+                      {item.isPopular && (
+                        <div className="absolute -top-2 -right-2 bg-bamm-yellow text-black p-1.5 rounded-xl shadow-sm rotate-12 group-hover:rotate-0 transition-transform">
+                          <Star size={10} fill="currentColor" />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+
+                    <div className="flex-1 min-w-0 flex flex-col justify-center pb-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md">
+                          {CATEGORY_LABELS[item.category] || item.category}
+                        </span>
+                      </div>
+                      <h3 className="text-base font-bold text-gray-900 leading-tight mb-2 pr-4">
+                        {item.name}
+                      </h3>
+                      <p className="text-[11px] text-gray-500 line-clamp-1 leading-relaxed max-w-[90%]">
+                        {item.description}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-3 pl-2 relative z-10 flex-shrink-0">
+                      <div className="flex items-baseline gap-0.5">
+                        <span className="text-[22px] font-black text-gray-900 tracking-tighter">
+                          {item.price.replace(/ TL|₺/g, "")}
+                        </span>
+                        <span className="text-[10px] font-bold text-gray-400">
+                          TL
+                        </span>
+                      </div>
+                      <div className="w-10 h-10 bg-black text-white rounded-2xl flex items-center justify-center shadow-md opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 absolute -right-2 bottom-0">
+                        <ChevronRight size={20} />
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
           </AnimatePresence>
 
           {filteredItems.length === 0 && (

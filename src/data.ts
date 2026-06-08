@@ -39,7 +39,7 @@ export interface HeroSlide {
 }
 
 export const CATEGORIES = [
-  "Kampanyalar", "Yemekler", "Kadeh", "Şişeler", "Şarap", "Kokteyller", "Alkolsüz Kokteyller", "Biralar", "Popüler", "Kahvaltı", "Kahveler", "Soğuk Kahveler", "Çaylar", "Atıştırmalıklar", "Salatalar", "Tatlılar", "Soğuk İçecekler", "Soft İçecekler"
+  "Kampanyalar", "Yemekler", "Kadeh", "Şişeler", "Şarap", "Kokteyller", "Alkolsüz Kokteyller", "Biralar", "Shotlar", "Popüler", "Kahvaltı", "Kahveler", "Soğuk Kahveler", "Çaylar", "Atıştırmalıklar", "Salatalar", "Tatlılar", "Soğuk İçecekler", "Soft İçecekler"
 ];
 
 export const MENU_DATA: MenuItem[] = [
@@ -2395,6 +2395,92 @@ export const MENU_DATA: MenuItem[] = [
     price: "145₺",
     category: "Çaylar",
     subcategory: "Bitki Çayları",
+  },
+  // --- SHOTLAR ---
+  // Vodka Shotlar
+  {
+    id: "shot_vo_1",
+    name: "Absolut Shot",
+    description: "",
+    price: "240₺",
+    category: "Shotlar",
+    subcategory: "Vodka Shotlar",
+  },
+  // Likör Shotlar
+  {
+    id: "shot_li_1",
+    name: "Baileys Shot",
+    description: "",
+    price: "160₺",
+    category: "Shotlar",
+    subcategory: "Likör Shotlar",
+  },
+  {
+    id: "shot_li_2",
+    name: "Jagermeister Shot",
+    description: "",
+    price: "240₺",
+    category: "Shotlar",
+    subcategory: "Likör Shotlar",
+  },
+  // Cin Shotlar
+  {
+    id: "shot_gi_1",
+    name: "Beefeater Gin Shot",
+    description: "",
+    price: "175₺",
+    category: "Shotlar",
+    subcategory: "Cin Shotlar",
+  },
+  // Tekila Shotlar
+  {
+    id: "shot_te_1",
+    name: "Olmeca Blanco Shot",
+    description: "",
+    price: "225₺",
+    category: "Shotlar",
+    subcategory: "Tekila Shotlar",
+  },
+  {
+    id: "shot_te_2",
+    name: "Olmeca Gold Shot",
+    description: "",
+    price: "225₺",
+    category: "Shotlar",
+    subcategory: "Tekila Shotlar",
+  },
+  // Viski Shotlar
+  {
+    id: "shot_wi_1",
+    name: "Chivas 12yr Shot",
+    description: "",
+    price: "210₺",
+    category: "Shotlar",
+    subcategory: "Viski Shotlar",
+  },
+  {
+    id: "shot_wi_2",
+    name: "Ballantines Shot",
+    description: "",
+    price: "150₺",
+    category: "Shotlar",
+    subcategory: "Viski Shotlar",
+  },
+  {
+    id: "shot_wi_3",
+    name: "Jack Daniels Shot",
+    description: "",
+    price: "170₺",
+    category: "Shotlar",
+    subcategory: "Viski Shotlar",
+  },
+  {
+    id: "shot_wi_4",
+    name: "Red Label Shot",
+    description: "",
+    price: "150₺",
+    category: "Shotlar",
+    subcategory: "Viski Shotlar",
   },
 ];
 
