@@ -507,7 +507,7 @@ export function HomeSection({
         </div>
         <div 
           ref={categoryScrollRef}
-          className="flex gap-4 overflow-x-auto no-scrollbar -mx-6 px-6 pb-6"
+          className="flex lg:grid lg:grid-cols-5 gap-4 overflow-x-auto lg:overflow-visible no-scrollbar -mx-6 px-6 lg:mx-0 lg:px-0 pb-6"
         >
           {[
             {
@@ -589,7 +589,7 @@ export function HomeSection({
             Tümünü Gör
           </button>
         </div>
-        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6">
+        <div className="flex lg:grid lg:grid-cols-3 gap-4 overflow-x-auto lg:overflow-visible no-scrollbar pb-4 -mx-6 px-6 lg:mx-0 lg:px-0">
           {MENU_DATA.filter((i) => i.isPopular).map((item) => {
             const ItemIcon = CATEGORY_ICONS[item.category] || Utensils;
 
@@ -1280,7 +1280,7 @@ export function MenuSection({
         )}
 
         {/* Product List - Horizontal Cards */}
-        <div className="bg-[#F8F9FA] flex-1 rounded-t-[40px] px-6 pt-8 pb-32 shadow-[0_-10px_20px_rgba(0,0,0,0.03)] space-y-4">
+        <div className="bg-[#F8F9FA] flex-1 rounded-t-[40px] px-6 pt-8 pb-32 shadow-[0_-10px_20px_rgba(0,0,0,0.03)] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 space-y-0 align-start items-start content-start">
           <AnimatePresence mode="popLayout">
             {filteredItems.map((item, idx) => {
               const ItemIcon = CATEGORY_ICONS[item.category] || Utensils;
@@ -1375,32 +1375,34 @@ export function CampaignsSection() {
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0 }}
-      className="px-6 space-y-6 pb-32"
+      className="px-6 pb-32"
     >
-      <h2 className="text-xl font-bold">Özel Kampanyalar</h2>
-      {CAMPAIGNS.map((campaign) => (
-        <div
-          key={campaign.id}
-          className="bg-gradient-to-br from-bamm-anthracite to-bamm-black border border-bamm-yellow/20 rounded-3xl overflow-hidden relative group"
-        >
-          <div className="p-6 relative z-10">
-            <span className="bg-bamm-yellow text-bamm-black px-3 py-1 rounded-full text-[10px] font-black uppercase mb-4 inline-block">
-              Fırsat Paneli
-            </span>
-            <h3 className="text-lg font-bold mb-2 group-hover:text-bamm-yellow transition-colors">
-              {campaign.title}
-            </h3>
-            <p className="text-sm text-gray-400 mb-6">{campaign.description}</p>
-            <button className="flex items-center gap-2 text-bamm-yellow font-bold text-sm">
-              Detayları İncele <ChevronRight size={16} />
-            </button>
+      <h2 className="text-xl font-bold mb-6">Özel Kampanyalar</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {CAMPAIGNS.map((campaign) => (
+          <div
+            key={campaign.id}
+            className="bg-gradient-to-br from-bamm-anthracite to-bamm-black border border-bamm-yellow/20 rounded-3xl overflow-hidden relative group"
+          >
+            <div className="p-6 relative z-10">
+              <span className="bg-bamm-yellow text-bamm-black px-3 py-1 rounded-full text-[10px] font-black uppercase mb-4 inline-block">
+                Fırsat Paneli
+              </span>
+              <h3 className="text-lg font-bold mb-2 group-hover:text-bamm-yellow transition-colors">
+                {campaign.title}
+              </h3>
+              <p className="text-sm text-gray-400 mb-6">{campaign.description}</p>
+              <button className="flex items-center gap-2 text-bamm-yellow font-bold text-sm">
+                Detayları İncele <ChevronRight size={16} />
+              </button>
+            </div>
+            <div className="absolute bottom-0 right-0 w-32 h-32 bg-bamm-yellow/10 rounded-full blur-3xl -mb-10 -mr-10" />
+            <div className="absolute top-0 right-4 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+              <Zap size={80} />
+            </div>
           </div>
-          <div className="absolute bottom-0 right-0 w-32 h-32 bg-bamm-yellow/10 rounded-full blur-3xl -mb-10 -mr-10" />
-          <div className="absolute top-0 right-4 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
-            <Zap size={80} />
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </motion.div>
   );
 }
@@ -1412,10 +1414,10 @@ export function EventsSection() {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="px-6 space-y-6 pb-32"
+      className="px-6 pb-32"
     >
-      <h2 className="text-xl font-bold">Yaklaşan Etkinlikler</h2>
-      <div className="space-y-4">
+      <h2 className="text-xl font-bold mb-6">Yaklaşan Etkinlikler</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         {EVENTS.map((event) => (
           <div
             key={event.id}

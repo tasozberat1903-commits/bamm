@@ -101,7 +101,7 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen ${activeTab === "menu" ? "bg-white" : activeTab === "contact" ? "bg-[#F5F5F3]" : "bg-bamm-black"} flex flex-col max-w-lg mx-auto relative shadow-2xl transition-colors duration-500 overflow-x-hidden`}
+      className={`min-h-screen ${activeTab === "menu" ? "bg-white" : activeTab === "contact" ? "bg-[#F5F5F3]" : "bg-bamm-black"} flex flex-col w-full max-w-none mx-auto relative transition-colors duration-500 overflow-x-hidden`}
     >
       <AnimatePresence>
         {isLoading ? (
