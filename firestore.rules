@@ -42,12 +42,12 @@ service cloud.firestore {
       return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
              data.price is string && data.price.size() > 0 && data.price.size() <= 30 &&
              data.category is string && data.category.size() > 0 && data.category.size() <= 60 &&
-             // Opsiyonel alanlar için tip ve boyut koruması
-             (data.get('description', '') is string && data.get('description', '').size() <= 1000) &&
-             (data.get('subcategory', '') is string && data.get('subcategory', '').size() <= 100) &&
-             (data.get('image', '') is string && data.get('image', '').size() <= 1000) &&
-             (data.get('isPopular', false) is bool) &&
-             (data.get('deleted', false) is bool);
+             // Opsiyonel alanlar için tip, varlık ve boyut koruması (null veya eksik durumları kapsar)
+             (data.get('description', null) == null || (data.description is string && data.description.size() <= 1000)) &&
+             (data.get('subcategory', null) == null || (data.subcategory is string && data.subcategory.size() <= 100)) &&
+             (data.get('image', null) == null || (data.image is string && data.image.size() <= 1048576)) &&
+             (data.get('isPopular', null) == null || data.isPopular is bool) &&
+             (data.get('deleted', null) == null || data.deleted is bool);
     }
 
     // --- Collections ---
@@ -56,16 +56,20 @@ service cloud.firestore {
       allow read: if true; // Genel kullanıcılar menüyü görebilir
       
       allow create: if isAdmin() && 
-                      isValidId(productId) && 
-                      isValidMenuItem(incoming());
+                      isValidId(productId) && (
+                        isValidMenuItem(incoming()) ||
+                        (incoming().keys().size() == 1 && incoming().deleted == true)
+                      );
       
       allow update: if isAdmin() && 
-                      isValidId(productId) &&
-                      isValidMenuItem(incoming()) && (
-                        // Veri tutarlılığı koruması: Belirli alanlar dışında değişim yapılamaz
-                        incoming().diff(existing()).affectedKeys().hasOnly([
-                          'name', 'description', 'price', 'category', 'subcategory', 'image', 'isPopular', 'deleted', 'id'
-                        ])
+                      isValidId(productId) && (
+                        (isValidMenuItem(incoming()) && (
+                          // Veri tutarlılığı koruması: Belirli alanlar dışında değişim yapılamaz
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'name', 'description', 'price', 'category', 'subcategory', 'image', 'isPopular', 'deleted', 'id'
+                          ])
+                        )) ||
+                        (incoming().keys().size() == 1 && incoming().deleted == true)
                       );
       
       allow delete: if isAdmin() && isValidId(productId);

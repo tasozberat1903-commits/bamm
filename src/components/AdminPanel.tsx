@@ -30,9 +30,52 @@ import {
   CheckCircle2,
   X,
   Star,
-  Lock
+  Lock,
+  Image as ImageIcon,
+  Upload
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 600;
+        const MAX_HEIGHT = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Compress as jpeg with 0.75 quality for balanced sharpness
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+        resolve(dataUrl);
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
 
 enum OperationType {
   CREATE = 'create',
@@ -91,6 +134,10 @@ export function AdminPanel() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [nfcStatus, setNfcStatus] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "settings">("products");
+
+  const [imageSourceTab, setImageSourceTab] = useState<"upload" | "url">("upload");
+  const [imageUploadLoading, setImageUploadLoading] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -200,6 +247,13 @@ export function AdminPanel() {
   const startEdit = (p: MenuItem) => {
     setIsEditing(p.id);
     setEditForm(p);
+    if (p.image) {
+      const isDataUri = p.image.startsWith("data:");
+      setImageSourceTab(isDataUri ? "upload" : "url");
+    } else {
+      setImageSourceTab("upload");
+    }
+    setImageUploadError("");
   };
 
   const startNew = () => {
@@ -212,6 +266,8 @@ export function AdminPanel() {
       description: "",
       image: "",
     });
+    setImageSourceTab("upload");
+    setImageUploadError("");
   };
 
   const writeNfcTag = async () => {
@@ -622,22 +678,120 @@ export function AdminPanel() {
                   />
                 </div>
 
-                <div>
-                  <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Görsel URL</label>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      placeholder="https://gorsel-linki.com/resim.jpg"
-                      value={editForm.image || ""}
-                      onChange={(e) => setEditForm({ ...editForm, image: e.target.value })}
-                      className="flex-1 bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
-                    />
-                    {editForm.image && (
-                      <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl border border-white/10 overflow-hidden bg-black shrink-0">
-                        <img src={editForm.image} className="w-full h-full object-cover" alt="Önizleme" />
-                      </div>
-                    )}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pl-1">
+                    <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest block font-sans">Ürün Görseli</label>
+                    <div className="flex gap-1 bg-black/40 p-0.5 rounded-lg border border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setImageSourceTab("upload")}
+                        className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+                          imageSourceTab === "upload"
+                            ? "bg-bamm-yellow text-black font-black"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        Cihazdan Yükle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImageSourceTab("url")}
+                        className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+                          imageSourceTab === "url"
+                            ? "bg-bamm-yellow text-black font-black"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        Görsel URL'si
+                      </button>
+                    </div>
                   </div>
+
+                  {imageSourceTab === "upload" ? (
+                    <div className="space-y-3">
+                      {editForm.image && editForm.image.startsWith("data:") ? (
+                        <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 p-4 flex items-center gap-4 group">
+                          <div className="w-16 h-16 rounded-xl overflow-hidden bg-black/50 border border-white/10 shrink-0">
+                            <img src={editForm.image} className="w-full h-full object-cover" alt="Yüklenen Görsel" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs text-green-400 font-bold block mb-1">Görsel Hazır! ✅</span>
+                            <span className="text-[10px] text-gray-500 block truncate">Cihazınızdaki görsel optimize edilerek kaydedildi.</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditForm(prev => ({ ...prev, image: "" }))}
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 p-2.5 rounded-xl transition-all border border-red-500/10 active:scale-95"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="relative flex flex-col items-center justify-center border-2 border-dashed border-white/10 hover:border-bamm-yellow/30 bg-black/20 hover:bg-black/40 rounded-2xl p-8 cursor-pointer transition-all text-center group">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (!file.type.startsWith("image/")) {
+                                setImageUploadError("Lütfen geçerli bir resim seçin.");
+                                return;
+                              }
+                              try {
+                                setImageUploadLoading(true);
+                                setImageUploadError("");
+                                const compressed = await compressImage(file);
+                                setEditForm(prev => ({ ...prev, image: compressed }));
+                              } catch (err) {
+                                console.error(err);
+                                setImageUploadError("Resim yüklenirken hata oluştu.");
+                              } finally {
+                                setImageUploadLoading(false);
+                              }
+                            }}
+                          />
+                          {imageUploadLoading ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-8 h-8 border-2 border-bamm-yellow border-t-transparent rounded-full animate-spin" />
+                              <span className="text-[11px] font-bold text-gray-400">Görsel Sıkıştırılıyor...</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-12 h-12 rounded-xl bg-white/5 group-hover:bg-bamm-yellow/10 flex items-center justify-center text-gray-400 group-hover:text-bamm-yellow transition-all mb-1 border border-white/5 group-hover:border-bamm-yellow/10">
+                                <Upload size={20} />
+                              </div>
+                              <span className="text-xs font-bold text-gray-300">Görsel Seçmek için Tıklayın</span>
+                              <span className="text-[10px] text-gray-500 max-w-[200px]">PNG, JPG, WEBP (Maksimum 600px genişliğinde optimize edilir)</span>
+                            </div>
+                          )}
+                        </label>
+                      )}
+
+                      {imageUploadError && (
+                        <div className="flex items-center gap-2 text-red-400 text-[11px] justify-center bg-red-400/10 p-3 rounded-xl border border-red-400/10">
+                          <AlertCircle size={14} />
+                          {imageUploadError}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        placeholder="https://gorsel-linki.com/resim.jpg"
+                        value={(editForm.image && !editForm.image.startsWith("data:")) ? editForm.image : ""}
+                        onChange={(e) => setEditForm({ ...editForm, image: e.target.value })}
+                        className="flex-1 bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                      />
+                      {editForm.image && !editForm.image.startsWith("data:") && (
+                        <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl border border-white/10 overflow-hidden bg-black shrink-0">
+                          <img src={editForm.image} className="w-full h-full object-cover" alt="Önizleme" referrerPolicy="no-referrer" />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 md:gap-4">
