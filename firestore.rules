@@ -63,13 +63,11 @@ service cloud.firestore {
       
       allow update: if isAdmin() && 
                       isValidId(productId) && (
-                        (isValidMenuItem(incoming()) && (
-                          // Veri tutarlılığı koruması: Belirli alanlar dışında değişim yapılamaz
-                          incoming().diff(existing()).affectedKeys().hasOnly([
-                            'name', 'description', 'price', 'category', 'subcategory', 'image', 'isPopular', 'deleted', 'id'
-                          ])
-                        )) ||
-                        (incoming().keys().size() == 1 && incoming().deleted == true)
+                        // Standard valid update
+                        (isValidMenuItem(incoming()) && 
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'price', 'category', 'subcategory', 'image', 'isPopular', 'deleted', 'id'])) ||
+                        // Specifically allow setting deleted=true for any valid product ID
+                        (incoming().deleted == true)
                       );
       
       allow delete: if isAdmin() && isValidId(productId);
