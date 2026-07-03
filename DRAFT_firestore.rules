@@ -54,6 +54,11 @@ service cloud.firestore {
 
     // --- Collections ---
 
+    match /categories/{categoryId} {
+      allow read: if true; // Herkes kategorileri okuyabilir
+      allow write, delete: if isAdmin() && isValidId(categoryId);
+    }
+
     match /products/{productId} {
       allow read: if true; // Genel kullanıcılar menüyü görebilir
       

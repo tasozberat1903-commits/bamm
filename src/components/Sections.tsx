@@ -46,7 +46,7 @@ import {
   BadgePercent,
   Calendar,
 } from "lucide-react";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { CATEGORIES, MENU_DATA, MenuItem, CAMPAIGNS, EVENTS, HEROSLIDES, HeroSlide } from "../data";
 import { db } from "../lib/firebase";
 import {
@@ -339,7 +339,7 @@ export function HomeSection({
                     {/* Optional yellow line */}
                     <div className="w-12 h-[2px] bg-bamm-yellow mt-6 opacity-80" />
                   </div>
-
+ 
                   {/* Play Button - Menüye Git */}
                   <div className="flex items-center gap-4 mt-auto relative z-10">
                     <motion.button
@@ -428,7 +428,7 @@ export function HomeSection({
               Kampanyalar
             </h2>
           </div>
-          <button className="text-gray-500 text-[9px] font-black tracking-widest uppercase active:text-white transition-colors">
+          <button onClick={() => onMenuClick("Kampanyalar")} className="text-gray-500 text-[9px] font-black tracking-widest uppercase active:text-white transition-colors">
             TÜMÜ
           </button>
         </div>
@@ -804,6 +804,24 @@ const CATEGORY_ORDER = [
   "Soft İçecekler"
 ];
 
+const PREFERRED_SUBCAT_ORDER = [
+  // Yemekler
+  "Breakfast", "Omletler", "Sahanda", "Tostlar", "Kahvaltı Yanı",
+  "Beyaz Etler", "Kırmızı Etler", "Burgerler", "Wrapler", "Makarnalar", "Pizzalar",
+  // Kokteyller & İçecekler
+  "İmza Kokteylleri", "Dünya Klasikleri",
+  "Healthy Detox", "Smoothie", "Frozen", "Milkshakes", "Limonata",
+  "Fıçı Biralar", "Şişe Biralar", "Kova Biralar", "İthal Biralar",
+  "Klasik", "Bitki Çayları",
+  // Alkol & Şişeler
+  "Kadeh", "Şişeler",
+  "Vodka", "Gin", "Tekila", "Rakı", "Şarap", "Viski",
+  "Vodka Shotlar", "Likör Shotlar", "Cin Shotlar", "Tekila Shotlar", "Viski Shotlar",
+  // Kampanyalar & Tatlılar
+  "1+1", "Shoot", "Fıçı Kampanya",
+  "Sıcaklar", "Soğuklar"
+];
+
 // --- Menu Section ---
 export function MenuSection({
   onProductClick,
@@ -822,6 +840,8 @@ export function MenuSection({
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>("Tümü");
   const [searchQuery, setSearchQuery] = useState("");
   const [liveMenu, setLiveMenu] = useState<MenuItem[]>(MENU_DATA);
+  const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string }[]>([]);
+  const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
     if (initialCategory) {
@@ -833,12 +853,57 @@ export function MenuSection({
     setSelectedSubcategory("Tümü");
   }, [selectedCategory]);
 
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "categories"), (snap) => {
+        if (!snap.empty) {
+          const cats = snap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as any))
+            .filter(cat => !cat.deleted)
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+          setDbCategories(cats);
+        } else {
+          setDbCategories([]);
+        }
+      }, (error) => {
+        console.warn("Firestore categories sync error: ", error);
+        setIsOffline(true);
+        if (unsub) {
+          try {
+            unsub();
+          } catch (e) {
+            console.warn("Error trying to unsubscribe from categories on error: ", e);
+          }
+        }
+      });
+    } catch (e) {
+      console.warn("Failed to initialize categories subscription: ", e);
+      setIsOffline(true);
+    }
+    return () => {
+      if (unsub) {
+        try {
+          unsub();
+        } catch (e) {
+          console.warn("Error in categories unsubscribe cleanup: ", e);
+        }
+      }
+    };
+  }, []);
+
   const dynamicCategories = Array.from(
     new Set([
-      ...CATEGORIES,
+      ...(dbCategories.length > 0 ? dbCategories.map(c => c.name) : CATEGORIES),
       ...liveMenu.map((item) => item.category).filter(Boolean),
     ])
   ).filter(cat => cat !== "Sıcak İçecekler").sort((a, b) => {
+    const catA = dbCategories.find(c => c.name === a);
+    const catB = dbCategories.find(c => c.name === b);
+    if (catA && catB) return catA.order - catB.order;
+    if (catA) return -1;
+    if (catB) return 1;
+
     const orderA = CATEGORY_ORDER.indexOf(a);
     const orderB = CATEGORY_ORDER.indexOf(b);
     if (orderA !== -1 && orderB !== -1) return orderA - orderB;
@@ -847,41 +912,92 @@ export function MenuSection({
     return a.localeCompare(b);
   });
 
+  const getCatDescription = (cat: string) => {
+    const dbCat = dbCategories.find(c => c.name === cat);
+    if (dbCat && dbCat.description) return dbCat.description;
+    return CATEGORY_DESCS[cat] || "Bamm Garden Lezzetleri";
+  };
+
   useEffect(() => {
     // Sadece admin panelinden eklenenleri değil, her şeyi birleştirmek için.
     // Eğer Firestore'a tüm menüyü aktardıysanız MENU_DATA'yı silebilirsiniz.
     // Şimdilik çökme olmaması ve mevcut verinin kaybolmaması adına birleştiriyoruz.
-    const unsub = onSnapshot(collection(db, "products"), (snap) => {
-      if (!snap.empty) {
-        const dbProducts = snap.docs.map(
-          (doc) => {
-            const data = doc.data() as any;
-            if (["Burgerler", "Pizzalar", "Makarnalar", "Dürümler & Bowl", "Ana Yemekler"].includes(data.category)) {
-              data.subcategory = data.category === "Dürümler & Bowl" ? "Wrapler" : (data.category === "Ana Yemekler" ? "Beyaz Etler" : data.category);
-              data.category = "Yemekler";
-            } else if (data.category === "Tost & Sandviç") {
-              data.subcategory = "Tostlar";
-              data.category = "Kahvaltı";
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "products"), (snap) => {
+        if (!snap.empty) {
+          const dbProducts = snap.docs.map(
+            (doc) => {
+              const data = doc.data() as any;
+              if (["Burgerler", "Pizzalar", "Makarnalar", "Dürümler & Bowl", "Ana Yemekler"].includes(data.category)) {
+                data.subcategory = data.category === "Dürümler & Bowl" ? "Wrapler" : (data.category === "Ana Yemekler" ? "Beyaz Etler" : data.category);
+                data.category = "Yemekler";
+              } else if (data.category === "Tost & Sandviç") {
+                data.subcategory = "Tostlar";
+                data.category = "Kahvaltı";
+              }
+              return { id: doc.id, ...data };
             }
-            return { id: doc.id, ...data };
+          );
+
+          // Veritabanındaki ürünler (id'si olanlar MENU_DATA'yı ezsin, yenileri eklensin)
+          const merged = [...MENU_DATA];
+          dbProducts.forEach((dbP) => {
+            const idx = merged.findIndex((m) => m.id === dbP.id);
+            if (idx !== -1) merged[idx] = dbP;
+            else merged.push(dbP);
+          });
+
+          // Veritabanında olmayan (silinmiş) ürünleri hariç tutmayı isterseniz ekstra mantık gerekir,
+          // şimdilik en güvenlisi MENU_DATA + Firestore eklemeleri olarak çalışmasıdır.
+          setLiveMenu(merged.filter(p => !p.deleted));
+        }
+      }, (error) => {
+        console.warn("Firestore products sync error: ", error);
+        setIsOffline(true);
+        if (unsub) {
+          try {
+            unsub();
+          } catch (e) {
+            console.warn("Error trying to unsubscribe from products on error: ", e);
           }
-        );
-
-        // Veritabanındaki ürünler (id'si olanlar MENU_DATA'yı ezsin, yenileri eklensin)
-        const merged = [...MENU_DATA];
-        dbProducts.forEach((dbP) => {
-          const idx = merged.findIndex((m) => m.id === dbP.id);
-          if (idx !== -1) merged[idx] = dbP;
-          else merged.push(dbP);
-        });
-
-        // Veritabanında olmayan (silinmiş) ürünleri hariç tutmayı isterseniz ekstra mantık gerekir,
-        // şimdilik en güvenlisi MENU_DATA + Firestore eklemeleri olarak çalışmasıdır.
-        setLiveMenu(merged.filter(p => !p.deleted));
+        }
+      });
+    } catch (e) {
+      console.warn("Failed to initialize products subscription: ", e);
+      setIsOffline(true);
+    }
+    return () => {
+      if (unsub) {
+        try {
+          unsub();
+        } catch (e) {
+          console.warn("Error in products unsubscribe cleanup: ", e);
+        }
       }
-    });
-    return unsub;
+    };
   }, []);
+
+  const categorySubcategories = useMemo(() => {
+    if (selectedCategory === "Popüler") return [];
+    
+    const subs = Array.from(
+      new Set(
+        liveMenu
+          .filter(item => item.category === selectedCategory && item.subcategory)
+          .map(item => item.subcategory as string)
+      )
+    ) as string[];
+
+    return subs.sort((a, b) => {
+      const idxA = PREFERRED_SUBCAT_ORDER.indexOf(a);
+      const idxB = PREFERRED_SUBCAT_ORDER.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+  }, [liveMenu, selectedCategory]);
 
   const filteredItems = liveMenu.filter((item) => {
     const matchesCategory =
@@ -890,7 +1006,7 @@ export function MenuSection({
         : item.category === selectedCategory;
 
     let matchesSubcategory = true;
-    if ((selectedCategory === "Kokteyller" || selectedCategory === "Alkolsüz Kokteyller" || selectedCategory === "Biralar" || selectedCategory === "Kampanyalar" || selectedCategory === "Yemekler" || selectedCategory === "Kahvaltı" || selectedCategory === "Kadeh" || selectedCategory === "Şişeler" || selectedCategory === "Şarap" || selectedCategory === "Tatlılar" || selectedCategory === "Çaylar" || selectedCategory === "Shotlar") && selectedSubcategory !== "Tümü") {
+    if (selectedSubcategory !== "Tümü") {
       matchesSubcategory = item.subcategory === selectedSubcategory;
     }
 
@@ -907,6 +1023,11 @@ export function MenuSection({
       exit={{ opacity: 0 }}
       className="bg-white min-h-screen flex flex-col pt-[env(safe-area-inset-top)]"
     >
+      {isOffline && (
+        <div className="bg-amber-500 text-white text-[11px] font-bold py-2 px-4 text-center tracking-wide uppercase shadow-sm">
+          ÇEVRİMDIŞI MOD / OFFLINE MODE (KOTA LİMİTİ AŞILDI)
+        </div>
+      )}
       {/* White Top Header Area */}
       <div className="bg-white pt-4 pb-8">
         <div className="px-6 flex items-center justify-between mb-8">
@@ -1006,9 +1127,7 @@ export function MenuSection({
               {selectedCategory === "Popüler" ? "Favoriler" : selectedCategory}
             </h1>
             <p className="text-gray-500 font-medium text-sm">
-              {selectedCategory === "Popüler" 
-                ? "En sevilen lezzetler burada." 
-                : `${selectedCategory} kategorisindeki ürünlerimiz.`}
+              {getCatDescription(selectedCategory)}
             </p>
           </div>
         </div>
@@ -1063,7 +1182,7 @@ export function MenuSection({
                 </span>
                 
                 <span className="text-[9px] font-medium text-gray-400 text-center leading-[1.2] px-1">
-                  {getCategoryDescription(cat)}
+                  {getCatDescription(cat)}
                 </span>
               
                 {isActive && (
@@ -1074,218 +1193,9 @@ export function MenuSection({
           })}
         </div>
 
-        {selectedCategory === "Tatlılar" && (
+        {categorySubcategories.length > 0 && (
           <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Sıcaklar", "Soğuklar"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Kokteyller" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "İmza Kokteylleri", "Dünya Klasikleri"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Alkolsüz Kokteyller" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Healthy Detox", "Smoothie", "Frozen", "Milkshakes", "Limonata"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Biralar" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Fıçı Biralar", "Şişe Biralar", "Kova Biralar", "İthal Biralar"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Kampanyalar" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "1+1", "Şarap", "Shoot", "Fıçı Kampanya"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Yemekler" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Beyaz Etler", "Kırmızı Etler", "Burgerler", "Wrapler", "Makarnalar", "Pizzalar"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Kahvaltı" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Breakfast", "Omletler", "Sahanda", "Tostlar", "Kahvaltı Yanı"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Kadeh" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Vodka", "Gin", "Rakı", "Viski"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Şişeler" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Vodka", "Gin", "Tekila", "Rakı", "Şarap", "Viski"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Şarap" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Kadeh", "Şişeler"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Çaylar" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Klasik", "Bitki Çayları"].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {selectedCategory === "Shotlar" && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", "Vodka Shotlar", "Likör Shotlar", "Cin Shotlar", "Tekila Shotlar", "Viski Shotlar"].map((subcat) => (
+            {["Tümü", ...categorySubcategories].map((subcat) => (
               <button
                 key={subcat}
                 onClick={() => setSelectedSubcategory(subcat)}
@@ -1309,7 +1219,7 @@ export function MenuSection({
               // If it's Shotlar, group them by subcategory
               (() => {
                 const subcats = selectedSubcategory === "Tümü"
-                  ? ["Vodka Shotlar", "Likör Shotlar", "Cin Shotlar", "Tekila Shotlar", "Viski Shotlar"]
+                  ? categorySubcategories
                   : [selectedSubcategory];
 
                 return subcats.map((subcat) => {

@@ -16,12 +16,29 @@
         "deleted": { "type": "boolean" }
       },
       "required": ["name", "price", "category"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "A menu category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "order": { "type": "number" },
+        "description": { "type": "string" },
+        "deleted": { "type": "boolean" }
+      },
+      "required": ["name", "order"]
     }
   },
   "firestore": {
     "products": {
       "schema": "MenuItem",
       "description": "Collection of all menu items"
+    },
+    "categories": {
+      "schema": "Category",
+      "description": "Collection of upper menu categories"
     },
     "admins": {
       "schema": {

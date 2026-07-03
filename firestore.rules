@@ -50,7 +50,24 @@ service cloud.firestore {
              (data.get('deleted', null) == null || data.deleted is bool);
     }
 
+    // --- Category Validation ---
+    function isValidCategory(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.order is int &&
+             (data.get('description', null) == null || (data.description is string && data.description.size() <= 1000)) &&
+             (data.get('deleted', null) == null || data.deleted is bool) &&
+             (data.get('id', null) == null || (data.id is string && data.id.size() <= 128));
+    }
+
     // --- Collections ---
+
+    match /categories/{categoryId} {
+      allow read: if true; // Herkes kategorileri okuyabilir
+      allow create: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming());
+      allow update: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'order', 'deleted', 'id']);
+      allow delete: if isAdmin() && isValidId(categoryId);
+    }
 
     match /products/{productId} {
       allow read: if true; // Genel kullanıcılar menüyü görebilir

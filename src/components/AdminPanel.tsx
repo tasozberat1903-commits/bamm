@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, useMemo, FormEvent } from "react";
 import { auth, db } from "../lib/firebase";
 import {
   signInWithEmailAndPassword,
@@ -13,6 +13,7 @@ import {
   addDoc,
   setDoc,
   doc,
+  deleteDoc,
 } from "firebase/firestore";
 import { CATEGORIES, MENU_DATA, MenuItem } from "../data";
 import { 
@@ -32,7 +33,10 @@ import {
   Star,
   Lock,
   Image as ImageIcon,
-  Upload
+  Upload,
+  ArrowUp,
+  ArrowDown,
+  FolderOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -103,7 +107,7 @@ interface FirestoreErrorInfo {
   }
 }
 
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null, shouldThrow: boolean = true) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -120,8 +124,12 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  if (shouldThrow) {
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+    throw new Error(JSON.stringify(errInfo));
+  } else {
+    console.warn('Firestore Error (Gracefully handled): ', JSON.stringify(errInfo));
+  }
 }
 
 export function AdminPanel() {
@@ -133,7 +141,27 @@ export function AdminPanel() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [nfcStatus, setNfcStatus] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "settings">("products");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "categories" | "settings">("products");
+  const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string; deleted?: boolean }[]>([]);
+  const [editingCategory, setEditingCategory] = useState<{ id: string | null; name: string; description: string; order: number } | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState<{ id: string; name: string } | null>(null);
+  const [firestoreError, setFirestoreError] = useState<string | null>(null);
+
+  const availableCategories = dbCategories.length > 0 ? dbCategories.map(c => c.name) : CATEGORIES;
+
+  const [showCustomSubcategoryInput, setShowCustomSubcategoryInput] = useState(false);
+
+  const currentCategorySubcategories = useMemo(() => {
+    if (!editForm.category) return [];
+    return (Array.from(
+      new Set(
+        products
+          .filter((p) => p.category === editForm.category && p.subcategory)
+          .map((p) => p.subcategory as string)
+      )
+    ) as string[]).sort((a, b) => a.localeCompare(b));
+  }, [products, editForm.category]);
 
   const [imageSourceTab, setImageSourceTab] = useState<"upload" | "url">("upload");
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
@@ -148,27 +176,88 @@ export function AdminPanel() {
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(collection(db, "products"), (snap) => {
-      if (!snap.empty) {
-        const dbProducts = snap.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() }) as any,
-        );
-        
-        const merged = [...MENU_DATA];
-        dbProducts.forEach((dbP) => {
-          const idx = merged.findIndex((m) => m.id === dbP.id);
-          if (idx !== -1) merged[idx] = dbP;
-          else merged.push(dbP);
-        });
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "products"), (snap) => {
+        if (!snap.empty) {
+          const dbProducts = snap.docs.map(
+            (doc) => ({ id: doc.id, ...doc.data() }) as any,
+          );
+          
+          const merged = [...MENU_DATA];
+          dbProducts.forEach((dbP) => {
+            const idx = merged.findIndex((m) => m.id === dbP.id);
+            if (idx !== -1) merged[idx] = dbP;
+            else merged.push(dbP);
+          });
 
-        setProducts(merged.filter(p => !p.deleted));
-      } else {
-        setProducts(MENU_DATA);
+          setProducts(merged.filter(p => !p.deleted));
+        } else {
+          setProducts(MENU_DATA);
+        }
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, "products", false);
+        setFirestoreError("Veritabanı kotası doldu veya bağlantı hatası oluştu. Çevrimdışı yedek veriler gösteriliyor.");
+        if (unsub) {
+          try {
+            unsub();
+          } catch (e) {
+            console.warn("Error trying to unsubscribe from products on error in AdminPanel: ", e);
+          }
+        }
+      });
+    } catch (e) {
+      console.warn("Failed to initialize products subscription in AdminPanel: ", e);
+      setFirestoreError("Veritabanı bağlantı hatası oluştu.");
+    }
+    return () => {
+      if (unsub) {
+        try {
+          unsub();
+        } catch (e) {
+          console.warn("Error in products unsubscribe cleanup in AdminPanel: ", e);
+        }
       }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, "products");
-    });
-    return unsub;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "categories"), (snap) => {
+        if (!snap.empty) {
+          const cats = snap.docs.map(
+            (doc) => ({ id: doc.id, ...doc.data() }) as any,
+          );
+          setDbCategories(cats.filter(c => !c.deleted).sort((a,b) => (a.order ?? 0) - (b.order ?? 0)));
+        } else {
+          setDbCategories([]);
+        }
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, "categories", false);
+        setFirestoreError("Veritabanı kotası doldu veya bağlantı hatası oluştu. Çevrimdışı yedek veriler gösteriliyor.");
+        if (unsub) {
+          try {
+            unsub();
+          } catch (e) {
+            console.warn("Error trying to unsubscribe from categories on error in AdminPanel: ", e);
+          }
+        }
+      });
+    } catch (e) {
+      console.warn("Failed to initialize categories subscription in AdminPanel: ", e);
+      setFirestoreError("Veritabanı bağlantı hatası oluştu.");
+    }
+    return () => {
+      if (unsub) {
+        try {
+          unsub();
+        } catch (e) {
+          console.warn("Error in categories unsubscribe cleanup in AdminPanel: ", e);
+        }
+      }
+    };
   }, [user]);
 
   const [usernameInput, setUsernameInput] = useState("");
@@ -244,6 +333,118 @@ export function AdminPanel() {
     }
   };
 
+  const seedDefaultCategories = async () => {
+    setIsSeeding(true);
+    try {
+      const CATEGORIES_TO_SEED = [
+        "Kampanyalar", "Yemekler", "Kadeh", "Şişeler", "Şarap", "Kokteyller", "Alkolsüz Kokteyller", "Biralar", "Shotlar", "Popüler", "Kahvaltı", "Kahveler", "Soğuk Kahveler", "Çaylar", "Atıştırmalıklar", "Salatalar", "Tatlılar", "Soğuk İçecekler", "Soft İçecekler"
+      ];
+      const SEED_DESCS: Record<string, string> = {
+        Popüler: "En sevilen favoriler",
+        Kampanyalar: "Özel fırsatlar ve avantajlar",
+        Yemekler: "Lezzetli yemek seçenekleri",
+        Kadeh: "Kadeh şarap ve içecekler",
+        Şişeler: "Premium şişe içecekler",
+        Şarap: "Kırmızı, beyaz ve roze şaraplar",
+        Kahvaltı: "Güne güzel başla",
+        Kokteyller: "İmza ve klasik lezzetler",
+        Biralar: "Fıçı ve şişe biralar",
+        Shotlar: "Çeşitli alkollü shot seçenekleri",
+      };
+
+      for (let i = 0; i < CATEGORIES_TO_SEED.length; i++) {
+        const catName = CATEGORIES_TO_SEED[i];
+        const id = catName.toLowerCase()
+          .replace(/ğ/g, "g")
+          .replace(/ü/g, "u")
+          .replace(/ş/g, "s")
+          .replace(/ı/g, "i")
+          .replace(/ö/g, "o")
+          .replace(/ç/g, "c")
+          .replace(/[^a-z0-9]/g, "-");
+        
+        await setDoc(doc(db, "categories", id), {
+          id,
+          name: catName,
+          order: i * 10,
+          description: SEED_DESCS[catName] || "Bamm Garden Lezzetleri",
+          deleted: false
+        });
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, "categories");
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const moveCategory = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= dbCategories.length) return;
+
+    const cat1 = dbCategories[index];
+    const cat2 = dbCategories[targetIndex];
+
+    try {
+      const tempOrder = cat1.order;
+      await setDoc(doc(db, "categories", cat1.id), { order: cat2.order }, { merge: true });
+      await setDoc(doc(db, "categories", cat2.id), { order: tempOrder }, { merge: true });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `categories/${cat1.id}`);
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "categories", id));
+      setDeletingCategory(null);
+    } catch (e) {
+      try {
+        await setDoc(doc(db, "categories", id), { deleted: true }, { merge: true });
+        setDeletingCategory(null);
+      } catch (e2) {
+        handleFirestoreError(e, OperationType.WRITE, `categories/${id}`);
+      }
+    }
+  };
+
+  const saveCategory = async () => {
+    if (!editingCategory) return;
+    if (!editingCategory.name.trim()) return;
+
+    try {
+      let id = editingCategory.id;
+      if (!id) {
+        id = editingCategory.name.toLowerCase()
+          .replace(/ğ/g, "g")
+          .replace(/ü/g, "u")
+          .replace(/ş/g, "s")
+          .replace(/ı/g, "i")
+          .replace(/ö/g, "o")
+          .replace(/ç/g, "c")
+          .replace(/[^a-z0-9]/g, "-");
+        
+        if (!id) {
+          id = "cat-" + Date.now();
+        }
+      }
+
+      const orderValue = editingCategory.order !== undefined ? editingCategory.order : (dbCategories.length * 10);
+
+      await setDoc(doc(db, "categories", id), {
+        id,
+        name: editingCategory.name.trim(),
+        description: editingCategory.description.trim() || "Bamm Garden Lezzetleri",
+        order: orderValue,
+        deleted: false
+      }, { merge: true });
+
+      setEditingCategory(null);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `categories/${editingCategory.id || "new"}`);
+    }
+  };
+
   const startEdit = (p: MenuItem) => {
     setIsEditing(p.id);
     setEditForm(p);
@@ -254,6 +455,17 @@ export function AdminPanel() {
       setImageSourceTab("upload");
     }
     setImageUploadError("");
+
+    const sub = p.subcategory || "";
+    const categorySubs = Array.from(
+      new Set(
+        products
+          .filter((prod) => prod.category === p.category && prod.subcategory)
+          .map((prod) => prod.subcategory as string)
+      )
+    );
+    const isCustom = sub !== "" && !categorySubs.includes(sub);
+    setShowCustomSubcategoryInput(isCustom);
   };
 
   const startNew = () => {
@@ -261,13 +473,14 @@ export function AdminPanel() {
     setEditForm({
       name: "",
       price: "",
-      category: CATEGORIES[0],
+      category: availableCategories[0] || "Yemekler",
       subcategory: "",
       description: "",
       image: "",
     });
     setImageSourceTab("upload");
     setImageUploadError("");
+    setShowCustomSubcategoryInput(false);
   };
 
   const writeNfcTag = async () => {
@@ -356,6 +569,7 @@ export function AdminPanel() {
           {[
             { id: "dashboard", icon: LayoutDashboard, label: "Hızlı Özet" },
             { id: "products", icon: Utensils, label: "Ürünler" },
+            { id: "categories", icon: FolderOpen, label: "Kategoriler" },
             { id: "settings", icon: Settings, label: "Sistem" },
           ].map((item) => (
             <button
@@ -389,6 +603,7 @@ export function AdminPanel() {
         {[
           { id: "dashboard", icon: LayoutDashboard, label: "Özet" },
           { id: "products", icon: Utensils, label: "Ürünler" },
+          { id: "categories", icon: FolderOpen, label: "Kategori" },
           { id: "settings", icon: Settings, label: "Ayarlar" },
         ].map((item) => {
           const isActive = activeTab === item.id;
@@ -425,6 +640,15 @@ export function AdminPanel() {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-0">
+        {firestoreError && (
+          <div className="bg-amber-500/20 border-b border-amber-500/30 text-amber-400 px-6 py-4 text-xs font-bold flex items-center gap-3">
+            <AlertCircle size={18} className="shrink-0" />
+            <div>
+              <p className="font-black uppercase tracking-wider mb-0.5">VERİTABANI KOTASI DOLDU / OFFLINE MODE</p>
+              <p className="font-normal opacity-80">Yeni ürün veya kategori eklenemez/güncellenemez, ancak mevcut menüyü incelemeye devam edebilirsiniz.</p>
+            </div>
+          </div>
+        )}
         {activeTab === "products" && (
           <div className="p-4 md:p-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
@@ -460,7 +684,7 @@ export function AdminPanel() {
               {/* Toolbar */}
               <div className="p-4 md:p-6 border-b border-white/5 flex flex-col md:flex-row gap-4 items-center justify-between bg-white/[0.01]">
                 <div className="flex gap-2 p-1 bg-black/40 rounded-2xl overflow-x-auto no-scrollbar w-full md:w-auto">
-                  {["Tümü", ...CATEGORIES.filter(c => products.some(p => p.category === c))].map(cat => (
+                  {["Tümü", ...availableCategories.filter(c => products.some(p => p.category === c))].map(cat => (
                     <button
                       key={cat}
                       onClick={() => setSelectedCategoryFilter(cat)}
@@ -605,6 +829,101 @@ export function AdminPanel() {
                 </p>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === "categories" && (
+          <div className="p-4 md:p-12 max-w-5xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-black text-white mb-2 uppercase tracking-tighter italic">Kategori Yönetimi</h1>
+                <p className="text-gray-500 text-xs md:text-sm">Menüdeki üst menü kategorilerini düzenleyin, sıralayın veya yeni ekleyin.</p>
+              </div>
+              <button
+                onClick={() => setEditingCategory({ id: null, name: "", description: "", order: dbCategories.length * 10 })}
+                className="bg-white text-black px-6 md:px-8 py-3 md:py-4 rounded-2xl font-black uppercase text-[10px] md:text-xs flex items-center justify-center gap-2 hover:bg-gray-200 active:scale-95 transition-all shadow-xl self-start md:self-auto"
+              >
+                <Plus size={18} /> Yeni Kategori Ekle
+              </button>
+            </div>
+
+            {dbCategories.length === 0 ? (
+              <div className="bg-[#16191E] p-10 rounded-[32px] border border-white/5 text-center flex flex-col items-center justify-center min-h-[300px]">
+                <div className="w-16 h-16 bg-bamm-yellow/10 rounded-3xl flex items-center justify-center mb-6 border border-bamm-yellow/20 animate-pulse">
+                  <FolderOpen size={28} className="text-bamm-yellow" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Henüz Dinamik Kategori Bulunmuyor</h3>
+                <p className="text-gray-400 text-xs md:text-sm max-w-md mb-8 leading-relaxed">
+                  Veritabanında tanımlı dinamik kategori bulunamadı. Hemen varsayılan kategorileri yükleyerek düzenlemeye başlayabilirsiniz.
+                </p>
+                <button
+                  onClick={seedDefaultCategories}
+                  disabled={isSeeding}
+                  className="bg-bamm-yellow text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] md:text-xs hover:bg-yellow-400 disabled:opacity-50 active:scale-95 transition-all shadow-xl shadow-bamm-yellow/10"
+                >
+                  {isSeeding ? "Yükleniyor..." : "Varsayılan Kategorileri Yükle"}
+                </button>
+              </div>
+            ) : (
+              <div className="bg-[#16191E] rounded-[32px] border border-white/5 overflow-hidden shadow-2xl">
+                <div className="p-5 md:p-6 border-b border-white/5 bg-white/[0.01]">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Üst Menü Kategorileri ({dbCategories.length})</h4>
+                </div>
+                <div className="divide-y divide-white/5">
+                  {dbCategories.map((cat, index) => (
+                    <div key={cat.id} className="p-5 flex items-center justify-between gap-4 hover:bg-white/[0.01] transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-[9px] font-black text-bamm-yellow bg-bamm-yellow/10 px-2.5 py-1 rounded-md tracking-wider">
+                            SIRA {index + 1}
+                          </span>
+                          <h4 className="text-sm font-bold text-white uppercase tracking-tight">{cat.name}</h4>
+                        </div>
+                        <p className="text-xs text-gray-500 truncate max-w-[280px] md:max-w-md">{cat.description || "Açıklama yok"}</p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+                        {/* Sıralama Okları */}
+                        <button
+                          onClick={() => moveCategory(index, 'up')}
+                          disabled={index === 0}
+                          className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white disabled:opacity-20 transition-all border border-white/5"
+                          title="Yukarı Taşı"
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                        <button
+                          onClick={() => moveCategory(index, 'down')}
+                          disabled={index === dbCategories.length - 1}
+                          className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white disabled:opacity-20 transition-all border border-white/5"
+                          title="Aşağı Taşı"
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+
+                        {/* Düzenle & Sil */}
+                        <button
+                          onClick={() => setEditingCategory({ id: cat.id, name: cat.name, description: cat.description || "", order: cat.order })}
+                          className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-white transition-all border border-white/5"
+                          title="Düzenle"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeletingCategory({ id: cat.id, name: cat.name });
+                          }}
+                          className="w-9 h-9 flex items-center justify-center bg-red-400/10 hover:bg-red-400/20 rounded-xl text-red-400 transition-all"
+                          title="Sil"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -810,10 +1129,13 @@ export function AdminPanel() {
                     <div className="relative">
                       <select
                         value={editForm.category || ""}
-                        onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                        onChange={(e) => {
+                          setEditForm({ ...editForm, category: e.target.value, subcategory: "" });
+                          setShowCustomSubcategoryInput(false);
+                        }}
                         className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white appearance-none cursor-pointer focus:ring-1 focus:ring-bamm-yellow"
                       >
-                        {CATEGORIES.map(c => <option key={c} value={c} className="text-black">{c}</option>)}
+                        {availableCategories.map(c => <option key={c} value={c} className="text-black">{c}</option>)}
                       </select>
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 pointer-events-none" />
                     </div>
@@ -821,14 +1143,70 @@ export function AdminPanel() {
                 </div>
 
                 <div>
-                   <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Alt Kategori (Opsiyonel)</label>
-                   <input
-                     type="text"
-                     placeholder="Örn: Burgerler, Sıcak Kokteyller"
-                     value={editForm.subcategory || ""}
-                     onChange={(e) => setEditForm({ ...editForm, subcategory: e.target.value })}
-                     className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
-                   />
+                  <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Alt Kategori (Opsiyonel)</label>
+                  {currentCategorySubcategories.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <select
+                          value={showCustomSubcategoryInput ? "__custom__" : (editForm.subcategory || "")}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "__custom__") {
+                              setShowCustomSubcategoryInput(true);
+                              setEditForm({ ...editForm, subcategory: "" });
+                            } else {
+                              setShowCustomSubcategoryInput(false);
+                              setEditForm({ ...editForm, subcategory: val });
+                            }
+                          }}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white appearance-none cursor-pointer focus:ring-1 focus:ring-bamm-yellow"
+                        >
+                          <option value="" className="text-black">Yok (Alt Kategori Yok)</option>
+                          {currentCategorySubcategories.map(sub => (
+                            <option key={sub} value={sub} className="text-black">{sub}</option>
+                          ))}
+                          <option value="__custom__" className="text-black">+ Yeni / Özel Alt Kategori Ekle...</option>
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 pointer-events-none" />
+                      </div>
+
+                      {showCustomSubcategoryInput && (
+                        <div className="pt-1">
+                          <div className="flex justify-between items-center mb-1.5 pl-1">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Yeni Alt Kategori Adı</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowCustomSubcategoryInput(false);
+                                setEditForm({ ...editForm, subcategory: "" });
+                              }}
+                              className="text-[9px] font-black text-bamm-yellow hover:underline uppercase"
+                            >
+                              Seçime Geri Dön
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="Örn: Burgerler, Sıcak Kokteyller"
+                            value={editForm.subcategory || ""}
+                            onChange={(e) => setEditForm({ ...editForm, subcategory: e.target.value })}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Örn: Burgerler, Sıcak Kokteyller"
+                        value={editForm.subcategory || ""}
+                        onChange={(e) => setEditForm({ ...editForm, subcategory: e.target.value })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1 pl-1">Bu kategoride daha önce oluşturulmuş alt kategori yok. Yeni bir tane yazabilirsiniz.</p>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -880,6 +1258,76 @@ export function AdminPanel() {
         )}
       </AnimatePresence>
 
+      {/* Category Edit/Add Modal */}
+      <AnimatePresence>
+        {editingCategory && (
+          <div className="fixed inset-0 z-[100] flex justify-end">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md" 
+              onClick={() => setEditingCategory(null)} 
+            />
+            <motion.div 
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="relative bg-[#16191E] w-full md:w-[480px] h-full shadow-2xl border-l border-white/5 flex flex-col p-6 md:p-12"
+            >
+              <div className="flex items-center justify-between mb-8 md:mb-10">
+                <h2 className="text-xl md:text-3xl font-black text-white uppercase tracking-tighter italic">
+                  {editingCategory.id ? "Kategori Düzenle" : "Yeni Kategori"}
+                </h2>
+                <button onClick={() => setEditingCategory(null)} className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-colors border border-white/10">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto no-scrollbar space-y-5 md:space-y-6 pb-20 md:pb-8 pr-1">
+                <div>
+                  <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Kategori Adı</label>
+                  <input
+                    type="text"
+                    placeholder="Örn: Ev Yapımı Limonatalar"
+                    value={editingCategory.name}
+                    onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Açıklama / Alt Başlık</label>
+                  <input
+                    type="text"
+                    placeholder="Örn: Taze ve ferahlatıcı seçenekler"
+                    value={editingCategory.description}
+                    onChange={(e) => setEditingCategory({ ...editingCategory, description: e.target.value })}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-auto pt-6 border-t border-white/5 flex gap-4 bg-[#16191E] relative z-10">
+                <button
+                  onClick={() => setEditingCategory(null)}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white py-4 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all border border-white/5"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={saveCategory}
+                  className="flex-1 bg-bamm-yellow hover:bg-yellow-400 text-black py-4 rounded-xl font-black uppercase text-[10px] md:text-xs transition-all shadow-xl shadow-bamm-yellow/10"
+                >
+                  Kaydet
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Delete Confirmation */}
       <AnimatePresence>
         {isDeleting && (
@@ -892,6 +1340,25 @@ export function AdminPanel() {
               <div className="flex flex-col gap-3">
                 <button onClick={() => confirmDelete(isDeleting)} className="w-full bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-red-500/20 active:scale-95 transition-all">Evet, Sil</button>
                 <button onClick={() => setIsDeleting(null)} className="w-full bg-white/5 text-gray-400 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:text-white transition-colors">Vazgeç</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Category Delete Confirmation */}
+      <AnimatePresence>
+        {deletingCategory && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setDeletingCategory(null)} />
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative bg-[#1A1D23] p-10 rounded-[48px] border border-white/10 shadow-2xl w-full max-w-sm text-center">
+              <div className="w-20 h-20 bg-red-500/10 rounded-[32px] flex items-center justify-center mx-auto mb-8 text-red-500"><Trash2 size={32} /></div>
+              <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter italic leading-none">Kategoriyi<br />Sil?</h2>
+              <p className="text-sm text-gray-400 mb-1 leading-relaxed">"${deletingCategory.name}" kategorisini silmek istediğinizden emin misiniz?</p>
+              <p className="text-[10px] text-gray-500 mb-10 leading-relaxed">Bu kategori altındaki ürünler silinmez fakat kategorileri güncellenene kadar ana menüde listelenmeyebilirler.</p>
+              <div className="flex flex-col gap-3">
+                <button onClick={() => deleteCategory(deletingCategory.id)} className="w-full bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-red-500/20 active:scale-95 transition-all">Evet, Sil</button>
+                <button onClick={() => setDeletingCategory(null)} className="w-full bg-white/5 text-gray-400 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:text-white transition-colors">Vazgeç</button>
               </div>
             </motion.div>
           </div>
