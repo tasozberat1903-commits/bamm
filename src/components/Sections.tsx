@@ -1023,11 +1023,6 @@ export function MenuSection({
       exit={{ opacity: 0 }}
       className="bg-white min-h-screen flex flex-col pt-[env(safe-area-inset-top)]"
     >
-      {isOffline && (
-        <div className="bg-amber-500 text-white text-[11px] font-bold py-2 px-4 text-center tracking-wide uppercase shadow-sm">
-          ÇEVRİMDIŞI MOD / OFFLINE MODE (KOTA LİMİTİ AŞILDI)
-        </div>
-      )}
       {/* White Top Header Area */}
       <div className="bg-white pt-4 pb-8">
         <div className="px-6 flex items-center justify-between mb-8">
