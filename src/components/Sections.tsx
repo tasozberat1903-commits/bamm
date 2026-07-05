@@ -53,6 +53,7 @@ import {
   collection,
   addDoc,
   onSnapshot,
+  getDocs,
   query,
   orderBy,
   limit,
@@ -853,43 +854,44 @@ export function MenuSection({
     setSelectedSubcategory("Tümü");
   }, [selectedCategory]);
 
+  const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes cache expiry
+
   useEffect(() => {
-    let unsub: (() => void) | undefined;
-    try {
-      unsub = onSnapshot(collection(db, "categories"), (snap) => {
+    const loadCategories = async () => {
+      try {
+        const cachedData = localStorage.getItem("bamm_categories_cache");
+        const cachedTime = localStorage.getItem("bamm_categories_cache_time");
+        
+        if (cachedData && cachedTime) {
+          const parsed = JSON.parse(cachedData);
+          setDbCategories(parsed);
+          
+          if (Date.now() - Number(cachedTime) < CACHE_EXPIRY_MS) {
+            return;
+          }
+        }
+        
+        const snap = await getDocs(collection(db, "categories"));
         if (!snap.empty) {
           const cats = snap.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as any))
             .filter(cat => !cat.deleted)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
           setDbCategories(cats);
+          localStorage.setItem("bamm_categories_cache", JSON.stringify(cats));
+          localStorage.setItem("bamm_categories_cache_time", String(Date.now()));
         } else {
           setDbCategories([]);
+          localStorage.setItem("bamm_categories_cache", JSON.stringify([]));
+          localStorage.setItem("bamm_categories_cache_time", String(Date.now()));
         }
-      }, (error) => {
-        console.warn("Firestore categories sync error: ", error);
+      } catch (error) {
+        console.warn("Firestore categories fetch error: ", error);
         setIsOffline(true);
-        if (unsub) {
-          try {
-            unsub();
-          } catch (e) {
-            console.warn("Error trying to unsubscribe from categories on error: ", e);
-          }
-        }
-      });
-    } catch (e) {
-      console.warn("Failed to initialize categories subscription: ", e);
-      setIsOffline(true);
-    }
-    return () => {
-      if (unsub) {
-        try {
-          unsub();
-        } catch (e) {
-          console.warn("Error in categories unsubscribe cleanup: ", e);
-        }
       }
     };
+
+    loadCategories();
   }, []);
 
   const dynamicCategories = Array.from(
@@ -919,63 +921,54 @@ export function MenuSection({
   };
 
   useEffect(() => {
-    // Sadece admin panelinden eklenenleri değil, her şeyi birleştirmek için.
-    // Eğer Firestore'a tüm menüyü aktardıysanız MENU_DATA'yı silebilirsiniz.
-    // Şimdilik çökme olmaması ve mevcut verinin kaybolmaması adına birleştiriyoruz.
-    let unsub: (() => void) | undefined;
-    try {
-      unsub = onSnapshot(collection(db, "products"), (snap) => {
-        if (!snap.empty) {
-          const dbProducts = snap.docs.map(
-            (doc) => {
-              const data = doc.data() as any;
-              if (["Burgerler", "Pizzalar", "Makarnalar", "Dürümler & Bowl", "Ana Yemekler"].includes(data.category)) {
-                data.subcategory = data.category === "Dürümler & Bowl" ? "Wrapler" : (data.category === "Ana Yemekler" ? "Beyaz Etler" : data.category);
-                data.category = "Yemekler";
-              } else if (data.category === "Tost & Sandviç") {
-                data.subcategory = "Tostlar";
-                data.category = "Kahvaltı";
-              }
-              return { id: doc.id, ...data };
-            }
-          );
-
-          // Veritabanındaki ürünler (id'si olanlar MENU_DATA'yı ezsin, yenileri eklensin)
-          const merged = [...MENU_DATA];
-          dbProducts.forEach((dbP) => {
-            const idx = merged.findIndex((m) => m.id === dbP.id);
-            if (idx !== -1) merged[idx] = dbP;
-            else merged.push(dbP);
-          });
-
-          // Veritabanında olmayan (silinmiş) ürünleri hariç tutmayı isterseniz ekstra mantık gerekir,
-          // şimdilik en güvenlisi MENU_DATA + Firestore eklemeleri olarak çalışmasıdır.
-          setLiveMenu(merged.filter(p => !p.deleted));
-        }
-      }, (error) => {
-        console.warn("Firestore products sync error: ", error);
-        setIsOffline(true);
-        if (unsub) {
-          try {
-            unsub();
-          } catch (e) {
-            console.warn("Error trying to unsubscribe from products on error: ", e);
+    const loadProducts = async () => {
+      try {
+        const cachedData = localStorage.getItem("bamm_products_cache");
+        const cachedTime = localStorage.getItem("bamm_products_cache_time");
+        
+        if (cachedData && cachedTime) {
+          const parsed = JSON.parse(cachedData);
+          setLiveMenu(parsed);
+          
+          if (Date.now() - Number(cachedTime) < CACHE_EXPIRY_MS) {
+            return;
           }
         }
-      });
-    } catch (e) {
-      console.warn("Failed to initialize products subscription: ", e);
-      setIsOffline(true);
-    }
-    return () => {
-      if (unsub) {
-        try {
-          unsub();
-        } catch (e) {
-          console.warn("Error in products unsubscribe cleanup: ", e);
+        
+        const snap = await getDocs(collection(db, "products"));
+        let dbProducts: any[] = [];
+        if (!snap.empty) {
+          dbProducts = snap.docs.map((doc) => {
+            const data = doc.data() as any;
+            if (["Burgerler", "Pizzalar", "Makarnalar", "Dürümler & Bowl", "Ana Yemekler"].includes(data.category)) {
+              data.subcategory = data.category === "Dürümler & Bowl" ? "Wrapler" : (data.category === "Ana Yemekler" ? "Beyaz Etler" : data.category);
+              data.category = "Yemekler";
+            } else if (data.category === "Tost & Sandviç") {
+              data.subcategory = "Tostlar";
+              data.category = "Kahvaltı";
+            }
+            return { id: doc.id, ...data };
+          });
         }
+        
+        const merged = [...MENU_DATA];
+        dbProducts.forEach((dbP) => {
+          const idx = merged.findIndex((m) => m.id === dbP.id);
+          if (idx !== -1) merged[idx] = dbP;
+          else merged.push(dbP);
+        });
+
+        const filteredLiveMenu = merged.filter(p => !p.deleted);
+        setLiveMenu(filteredLiveMenu);
+        localStorage.setItem("bamm_products_cache", JSON.stringify(filteredLiveMenu));
+        localStorage.setItem("bamm_products_cache_time", String(Date.now()));
+      } catch (error) {
+        console.warn("Firestore products fetch error: ", error);
+        setIsOffline(true);
       }
     };
+
+    loadProducts();
   }, []);
 
   const categorySubcategories = useMemo(() => {

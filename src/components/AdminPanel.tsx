@@ -10,6 +10,7 @@ import {
 import {
   collection,
   onSnapshot,
+  getDocs,
   addDoc,
   setDoc,
   doc,
@@ -640,15 +641,6 @@ export function AdminPanel() {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-0">
-        {firestoreError && (
-          <div className="bg-amber-500/20 border-b border-amber-500/30 text-amber-400 px-6 py-4 text-xs font-bold flex items-center gap-3">
-            <AlertCircle size={18} className="shrink-0" />
-            <div>
-              <p className="font-black uppercase tracking-wider mb-0.5">VERİTABANI KOTASI DOLDU / OFFLINE MODE</p>
-              <p className="font-normal opacity-80">Yeni ürün veya kategori eklenemez/güncellenemez, ancak mevcut menüyü incelemeye devam edebilirsiniz.</p>
-            </div>
-          </div>
-        )}
         {activeTab === "products" && (
           <div className="p-4 md:p-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
