@@ -518,7 +518,7 @@ export function HomeSection({
             },
             {
               name: "Kahvaltı",
-              img: "https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&q=80&w=600",
+              img: "/kahvalti.avif",
               color: "#06B6D4",
             },
             {
@@ -1104,8 +1104,15 @@ export function MenuSection({
         </div>
 
         <div className="px-6 flex items-start gap-4">
-          <div className="w-[52px] h-[52px] bg-[#FFF8D6] rounded-full flex items-center justify-center text-[#0F172A] shrink-0 mt-1">
-            {(() => {
+          <div className="w-[52px] h-[52px] bg-[#FFF8D6] rounded-full flex items-center justify-center text-[#0F172A] shrink-0 mt-1 overflow-hidden">
+            {selectedCategory === "Kahvaltı" ? (
+              <img
+                src="/kahvalti.avif"
+                alt="Kahvaltı"
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (() => {
               const TitleIcon = CATEGORY_ICONS[selectedCategory] || Utensils;
               return <TitleIcon size={26} strokeWidth={2.5} />;
             })()}
@@ -1141,16 +1148,25 @@ export function MenuSection({
                 }`}
               >
                 <div
-                  className={`relative rounded-full flex items-center justify-center transition-all duration-300 mb-2 ${
+                  className={`relative rounded-full flex items-center justify-center transition-all duration-300 mb-2 overflow-hidden ${
                     isActive
                       ? "w-14 h-14 bg-bamm-yellow text-black"
                       : "w-14 h-14 bg-[#F4F4F5] text-gray-400 group-hover:bg-[#E4E4E7] group-hover:text-gray-900"
                   }`}
                 >
-                  <Icon
-                    size={24}
-                    strokeWidth={1.5}
-                  />
+                  {cat === "Kahvaltı" ? (
+                    <img
+                      src="/kahvalti.avif"
+                      alt="Kahvaltı"
+                      className="w-full h-full object-cover rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <Icon
+                      size={24}
+                      strokeWidth={1.5}
+                    />
+                  )}
                 </div>
                 
                 {itemCount > 0 && (
