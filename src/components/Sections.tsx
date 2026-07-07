@@ -518,7 +518,7 @@ export function HomeSection({
             },
             {
               name: "Kahvaltı",
-              img: "/kahvalti.avif",
+              img: "/images.jpg",
               color: "#06B6D4",
             },
             {
@@ -1107,7 +1107,7 @@ export function MenuSection({
           <div className="w-[52px] h-[52px] bg-[#FFF8D6] rounded-full flex items-center justify-center text-[#0F172A] shrink-0 mt-1 overflow-hidden">
             {selectedCategory === "Kahvaltı" ? (
               <img
-                src="/kahvalti.avif"
+                src="/images.jpg"
                 alt="Kahvaltı"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
@@ -1156,7 +1156,7 @@ export function MenuSection({
                 >
                   {cat === "Kahvaltı" ? (
                     <img
-                      src="/kahvalti.avif"
+                      src="/images.jpg"
                       alt="Kahvaltı"
                       className="w-full h-full object-cover rounded-full"
                       referrerPolicy="no-referrer"
