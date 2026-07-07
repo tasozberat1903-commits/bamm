@@ -854,7 +854,7 @@ export function MenuSection({
     setSelectedSubcategory("Tümü");
   }, [selectedCategory]);
 
-  const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes cache expiry
+  const CACHE_EXPIRY_MS = 30 * 1000; // 30 seconds cache expiry
 
   useEffect(() => {
     const loadCategories = async () => {
