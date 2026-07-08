@@ -26,6 +26,7 @@
         "name": { "type": "string" },
         "order": { "type": "number" },
         "description": { "type": "string" },
+        "image": { "type": "string" },
         "deleted": { "type": "boolean" }
       },
       "required": ["name", "order"]

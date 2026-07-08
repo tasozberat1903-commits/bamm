@@ -10,7 +10,6 @@ import {
   ProductDetail,
   SearchModal,
   InfoModal,
-  PwaInstallModal,
 } from "./components/Sections";
 import { AdminPanel } from "./components/AdminPanel";
 import { MenuItem } from "./data";
@@ -24,7 +23,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
-  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
   const scrollToTop = () => {
@@ -43,7 +41,6 @@ export default function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
-      setIsPwaModalOpen(true);
     }, 1500);
     return () => clearTimeout(timer);
   }, []);
@@ -207,11 +204,6 @@ export default function App() {
             <InfoModal
               isOpen={isInfoOpen}
               onClose={() => setIsInfoOpen(false)}
-            />
-
-            <PwaInstallModal
-              isOpen={isPwaModalOpen}
-              onClose={() => setIsPwaModalOpen(false)}
             />
           </>
         )}

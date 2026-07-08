@@ -38,6 +38,7 @@ import {
   X,
   ArrowLeft,
   Wifi,
+  WifiOff,
   Lock,
   Tag,
   MousePointer2,
@@ -256,6 +257,50 @@ export function HomeSection({
   const campaignScrollRef = useRef<HTMLDivElement>(null);
   const heroScrollRef = useRef<HTMLDivElement>(null);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string; image?: string }[]>([]);
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    const cachedTime = localStorage.getItem("bamm_categories_cache_time");
+    const cachedData = localStorage.getItem("bamm_categories_cache");
+    let hasFreshCache = false;
+
+    if (cachedData && cachedTime) {
+      try {
+        setDbCategories(JSON.parse(cachedData));
+        // 30 seconds cache expiry
+        if (Date.now() - Number(cachedTime) < 30 * 1000) {
+          hasFreshCache = true;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    
+    if (hasFreshCache) {
+      return;
+    }
+    
+    const fetchFresh = async () => {
+      try {
+        const snap = await getDocs(collection(db, "categories"));
+        if (!snap.empty) {
+          const cats = snap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as any))
+            .filter(cat => !cat.deleted)
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+          setDbCategories(cats);
+          localStorage.setItem("bamm_categories_cache", JSON.stringify(cats));
+          localStorage.setItem("bamm_categories_cache_time", String(Date.now()));
+        }
+      } catch (e) {
+        console.error(e);
+        setIsOffline(true);
+      }
+    };
+    
+    fetchFresh();
+  }, []);
 
   const scrollHero = (direction: 'left' | 'right') => {
     if (heroScrollRef.current) {
@@ -299,8 +344,10 @@ export function HomeSection({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="space-y-10 pb-32"
+      className="space-y-10 pb-32 animate-fade-in"
     >
+
+
       {/* Hero Section Container */}
       <div className="px-5 mt-4">
         {/* Scrollable Container with navigation */}
@@ -518,7 +565,7 @@ export function HomeSection({
             },
             {
               name: "Kahvaltı",
-              img: "/images.jpg",
+              img: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&q=80&w=600",
               color: "#06B6D4",
             },
             {
@@ -536,23 +583,27 @@ export function HomeSection({
               img: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&q=80&w=600",
               color: "#3B82F6",
             },
-          ].map((cat, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              whileHover={{ y: -8 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => onMenuClick(cat.name)}
-              className="min-w-[160px] h-56 rounded-[32px] relative overflow-hidden group cursor-pointer shadow-2xl border border-white/5"
-            >
-              <img
-                src={cat.img}
-                alt={cat.name}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                referrerPolicy="no-referrer"
-              />
+          ].map((cat, i) => {
+            const dbCat = dbCategories.find(c => c.name === cat.name);
+            const imageToShow = dbCat?.image || cat.img;
+
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                whileHover={{ y: -8 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onMenuClick(cat.name)}
+                className="min-w-[160px] h-56 rounded-[32px] relative overflow-hidden group cursor-pointer shadow-2xl border border-white/5"
+              >
+                <img
+                  src={imageToShow}
+                  alt={cat.name}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                  referrerPolicy="no-referrer"
+                />
               {/* Gradient Scrim */}
               <div className="absolute inset-0 bg-gradient-to-t from-bamm-black via-bamm-black/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
 
@@ -574,84 +625,11 @@ export function HomeSection({
               {/* Texture/Overlay */}
               <div className="absolute inset-0 pointer-events-none border border-white/10 rounded-[32px]" />
             </motion.div>
-          ))}
+          )})}
         </div>
       </div>
 
-      <div className="space-y-4 px-6 md:px-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold italic uppercase tracking-tight">
-            Popüler Lezzetler
-          </h2>
-          <button
-            onClick={() => onMenuClick()}
-            className="text-bamm-yellow text-[9px] font-black tracking-widest uppercase border-b border-bamm-yellow/20 pb-0.5"
-          >
-            Tümünü Gör
-          </button>
-        </div>
-        <div className="flex lg:grid lg:grid-cols-3 gap-4 overflow-x-auto lg:overflow-visible no-scrollbar pb-4 -mx-6 px-6 lg:mx-0 lg:px-0">
-          {MENU_DATA.filter((i) => i.isPopular).map((item) => {
-            const ItemIcon = CATEGORY_ICONS[item.category] || Utensils;
 
-            return (
-              <div
-                key={item.id}
-                className="min-w-[200px] bg-gradient-to-br from-bamm-anthracite to-[#13151A] rounded-3xl p-5 border border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.2)] relative overflow-hidden group cursor-pointer hover:shadow-[0_15px_40px_rgba(0,0,0,0.4)] hover:-translate-y-1 transition-all duration-300"
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-bamm-yellow/5 rounded-full blur-2xl group-hover:bg-bamm-yellow/10 transition-colors duration-500 pointer-events-none" />
-
-                <div className="flex items-start justify-between mb-4 relative z-10">
-                  <div className="w-[52px] h-[52px] rounded-[18px] bg-white/5 flex items-center justify-center border border-white/5 group-hover:scale-110 group-hover:bg-bamm-yellow/10 transition-all duration-300">
-                    <ItemIcon
-                      size={24}
-                      className="text-gray-400 group-hover:text-bamm-yellow transition-colors"
-                      strokeWidth={1.5}
-                    />
-                  </div>
-                  <div className="bg-bamm-yellow/10 border border-bamm-yellow/20 px-2.5 py-1 rounded-full flex items-center gap-1 group-hover:bg-bamm-yellow group-hover:border-bamm-yellow group-hover:shadow-[0_4px_12px_rgba(255,204,0,0.3)] transition-all duration-300">
-                    <Star
-                      size={10}
-                      className="text-[#B38F00] group-hover:text-black transition-colors"
-                      fill="currentColor"
-                    />
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#B38F00] group-hover:text-black transition-colors">
-                      Popüler
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mb-4 relative z-10">
-                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 block mb-1">
-                    {CATEGORY_LABELS[item.category] || item.category}
-                  </span>
-                  <h3 className="font-black text-white text-[15px] truncate leading-tight transition-colors">
-                    {item.name}
-                  </h3>
-                  <p className="text-[11px] text-gray-400 line-clamp-1 mt-1 leading-relaxed">
-                    {item.description}
-                  </p>
-                </div>
-
-                <div className="flex justify-between items-center relative z-10 pt-2 border-t border-white/5">
-                  <div className="flex items-baseline gap-0.5">
-                    <span className="text-xl font-black text-white tracking-tighter">
-                      {item.price.replace(/ TL|₺/g, "")}
-                    </span>
-                    <span className="text-[10px] font-bold text-gray-400">
-                      TL
-                    </span>
-                  </div>
-
-                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-bamm-yellow group-hover:text-black transition-colors duration-300">
-                    <ChevronRight size={16} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Social Media Footer */}
       <div className="pt-10 pb-8 mt-4 flex flex-col items-center justify-center border-t border-black/[0.04]">
@@ -1016,6 +994,7 @@ export function MenuSection({
       exit={{ opacity: 0 }}
       className="bg-white min-h-screen flex flex-col pt-[env(safe-area-inset-top)]"
     >
+
       {/* White Top Header Area */}
       <div className="bg-white pt-4 pb-8">
         <div className="px-6 flex items-center justify-between mb-8">
@@ -1105,14 +1084,18 @@ export function MenuSection({
 
         <div className="px-6 flex items-start gap-4">
           <div className="w-[52px] h-[52px] bg-[#FFF8D6] rounded-full flex items-center justify-center text-[#0F172A] shrink-0 mt-1 overflow-hidden">
-            {selectedCategory === "Kahvaltı" ? (
-              <img
-                src="/images.jpg"
-                alt="Kahvaltı"
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            ) : (() => {
+            {(() => {
+              const dbCat = dbCategories.find(c => c.name === selectedCategory);
+              if (dbCat?.image) {
+                return (
+                  <img
+                    src={dbCat.image}
+                    alt={selectedCategory}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                );
+              }
               const TitleIcon = CATEGORY_ICONS[selectedCategory] || Utensils;
               return <TitleIcon size={26} strokeWidth={2.5} />;
             })()}
@@ -1136,6 +1119,7 @@ export function MenuSection({
             const isActive = selectedCategory === cat;
             const Icon = CATEGORY_ICONS[cat] || Utensils;
             const itemCount = liveMenu.filter(item => cat === "Popüler" ? item.isPopular : item.category === cat).length;
+            const dbCat = dbCategories.find(c => c.name === cat);
             
             return (
               <button
@@ -1154,10 +1138,10 @@ export function MenuSection({
                       : "w-14 h-14 bg-[#F4F4F5] text-gray-400 group-hover:bg-[#E4E4E7] group-hover:text-gray-900"
                   }`}
                 >
-                  {cat === "Kahvaltı" ? (
+                  {dbCat?.image ? (
                     <img
-                      src="/images.jpg"
-                      alt="Kahvaltı"
+                      src={dbCat.image}
+                      alt={cat}
                       className="w-full h-full object-cover rounded-full"
                       referrerPolicy="no-referrer"
                     />

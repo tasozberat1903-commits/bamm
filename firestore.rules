@@ -45,7 +45,7 @@ service cloud.firestore {
              // Opsiyonel alanlar için tip, varlık ve boyut koruması (null veya eksik durumları kapsar)
              (data.get('description', null) == null || (data.description is string && data.description.size() <= 1000)) &&
              (data.get('subcategory', null) == null || (data.subcategory is string && data.subcategory.size() <= 100)) &&
-             (data.get('image', null) == null || (data.image is string && data.image.size() <= 1048576)) &&
+             (data.get('image', null) == null || (data.image is string && data.image.size() <= 10485760)) &&
              (data.get('isPopular', null) == null || data.isPopular is bool) &&
              (data.get('deleted', null) == null || data.deleted is bool);
     }
@@ -53,8 +53,9 @@ service cloud.firestore {
     // --- Category Validation ---
     function isValidCategory(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-             data.order is int &&
+             (data.order is int || data.order is float) &&
              (data.get('description', null) == null || (data.description is string && data.description.size() <= 1000)) &&
+             (data.get('image', null) == null || (data.image is string && data.image.size() <= 10485760)) &&
              (data.get('deleted', null) == null || data.deleted is bool) &&
              (data.get('id', null) == null || (data.id is string && data.id.size() <= 128));
     }
@@ -65,7 +66,7 @@ service cloud.firestore {
       allow read: if true; // Herkes kategorileri okuyabilir
       allow create: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming());
       allow update: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming()) &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'order', 'deleted', 'id']);
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'order', 'deleted', 'id', 'image']);
       allow delete: if isAdmin() && isValidId(categoryId);
     }
 

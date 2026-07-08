@@ -37,7 +37,8 @@ import {
   Upload,
   ArrowUp,
   ArrowDown,
-  FolderOpen
+  FolderOpen,
+  WifiOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -143,8 +144,12 @@ export function AdminPanel() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [nfcStatus, setNfcStatus] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "categories" | "settings">("products");
-  const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string; deleted?: boolean }[]>([]);
-  const [editingCategory, setEditingCategory] = useState<{ id: string | null; name: string; description: string; order: number } | null>(null);
+  const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string; image?: string; deleted?: boolean }[]>([]);
+  const [editingCategory, setEditingCategory] = useState<{ id: string | null; name: string; description: string; order: number; image?: string } | null>(null);
+  const [categoryImageSourceTab, setCategoryImageSourceTab] = useState<"upload" | "url">("upload");
+  const [categoryImageUploadLoading, setCategoryImageUploadLoading] = useState(false);
+  const [categoryImageUploadError, setCategoryImageUploadError] = useState("");
+  const [categorySaveError, setCategorySaveError] = useState("");
   const [isSeeding, setIsSeeding] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState<{ id: string; name: string } | null>(null);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
@@ -300,6 +305,17 @@ export function AdminPanel() {
     await signOut(auth);
   };
 
+  const clearMenuCaches = () => {
+    try {
+      localStorage.removeItem("bamm_categories_cache");
+      localStorage.removeItem("bamm_categories_cache_time");
+      localStorage.removeItem("bamm_products_cache");
+      localStorage.removeItem("bamm_products_cache_time");
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleSave = async () => {
     try {
       const cleanData: any = {};
@@ -320,6 +336,7 @@ export function AdminPanel() {
       }
       setIsEditing(null);
       setEditForm({});
+      clearMenuCaches();
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, "products");
     }
@@ -329,6 +346,7 @@ export function AdminPanel() {
     try {
       await setDoc(doc(db, "products", id), { deleted: true }, { merge: true });
       setIsDeleting(null);
+      clearMenuCaches();
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `products/${id}`);
     }
@@ -372,6 +390,7 @@ export function AdminPanel() {
           deleted: false
         });
       }
+      clearMenuCaches();
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, "categories");
     } finally {
@@ -390,6 +409,7 @@ export function AdminPanel() {
       const tempOrder = cat1.order;
       await setDoc(doc(db, "categories", cat1.id), { order: cat2.order }, { merge: true });
       await setDoc(doc(db, "categories", cat2.id), { order: tempOrder }, { merge: true });
+      clearMenuCaches();
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `categories/${cat1.id}`);
     }
@@ -399,10 +419,12 @@ export function AdminPanel() {
     try {
       await deleteDoc(doc(db, "categories", id));
       setDeletingCategory(null);
+      clearMenuCaches();
     } catch (e) {
       try {
         await setDoc(doc(db, "categories", id), { deleted: true }, { merge: true });
         setDeletingCategory(null);
+        clearMenuCaches();
       } catch (e2) {
         handleFirestoreError(e, OperationType.WRITE, `categories/${id}`);
       }
@@ -414,6 +436,7 @@ export function AdminPanel() {
     if (!editingCategory.name.trim()) return;
 
     try {
+      setCategorySaveError("");
       let id = editingCategory.id;
       if (!id) {
         id = editingCategory.name.toLowerCase()
@@ -436,13 +459,16 @@ export function AdminPanel() {
         id,
         name: editingCategory.name.trim(),
         description: editingCategory.description.trim() || "Bamm Garden Lezzetleri",
+        image: editingCategory.image || "",
         order: orderValue,
         deleted: false
       }, { merge: true });
 
       setEditingCategory(null);
+      clearMenuCaches();
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, `categories/${editingCategory.id || "new"}`);
+      console.error("Kategori kaydetme hatası:", e);
+      setCategorySaveError(e instanceof Error ? "Hata: " + e.message : "Kategori kaydedilirken bir hata oluştu.");
     }
   };
 
@@ -482,6 +508,37 @@ export function AdminPanel() {
     setImageSourceTab("upload");
     setImageUploadError("");
     setShowCustomSubcategoryInput(false);
+  };
+
+  const startNewCategory = () => {
+    setEditingCategory({
+      id: null,
+      name: "",
+      description: "",
+      order: dbCategories.length * 10,
+      image: "",
+    });
+    setCategoryImageSourceTab("upload");
+    setCategoryImageUploadError("");
+    setCategorySaveError("");
+  };
+
+  const startEditCategory = (cat: any) => {
+    setEditingCategory({
+      id: cat.id,
+      name: cat.name,
+      description: cat.description || "",
+      order: cat.order,
+      image: cat.image || "",
+    });
+    if (cat.image) {
+      const isDataUri = cat.image.startsWith("data:");
+      setCategoryImageSourceTab(isDataUri ? "upload" : "url");
+    } else {
+      setCategoryImageSourceTab("upload");
+    }
+    setCategoryImageUploadError("");
+    setCategorySaveError("");
   };
 
   const writeNfcTag = async () => {
@@ -641,6 +698,22 @@ export function AdminPanel() {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-0">
+        {firestoreError && (
+          <div className="mx-4 md:mx-12 mt-4 md:mt-8 bg-amber-500/10 border border-bamm-yellow/30 rounded-3xl p-4 md:p-6 flex items-start gap-3 shadow-[0_4px_20px_rgba(250,204,21,0.05)]">
+            <div className="p-2.5 bg-bamm-yellow text-bamm-black rounded-xl shrink-0">
+              <WifiOff size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-xs md:text-sm font-black text-bamm-yellow uppercase tracking-wider mb-1">
+                Veritabanı Çevrimdışı / Kota Sınırı
+              </h4>
+              <p className="text-[11px] md:text-xs text-gray-300 font-medium leading-relaxed">
+                {firestoreError}
+              </p>
+            </div>
+          </div>
+        )}
+
         {activeTab === "products" && (
           <div className="p-4 md:p-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
@@ -832,7 +905,7 @@ export function AdminPanel() {
                 <p className="text-gray-500 text-xs md:text-sm">Menüdeki üst menü kategorilerini düzenleyin, sıralayın veya yeni ekleyin.</p>
               </div>
               <button
-                onClick={() => setEditingCategory({ id: null, name: "", description: "", order: dbCategories.length * 10 })}
+                onClick={startNewCategory}
                 className="bg-white text-black px-6 md:px-8 py-3 md:py-4 rounded-2xl font-black uppercase text-[10px] md:text-xs flex items-center justify-center gap-2 hover:bg-gray-200 active:scale-95 transition-all shadow-xl self-start md:self-auto"
               >
                 <Plus size={18} /> Yeni Kategori Ekle
@@ -895,7 +968,7 @@ export function AdminPanel() {
 
                         {/* Düzenle & Sil */}
                         <button
-                          onClick={() => setEditingCategory({ id: cat.id, name: cat.name, description: cat.description || "", order: cat.order })}
+                          onClick={() => startEditCategory(cat)}
                           className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-white transition-all border border-white/5"
                           title="Düzenle"
                         >
@@ -1299,7 +1372,130 @@ export function AdminPanel() {
                     className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
                   />
                 </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pl-1">
+                    <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest block font-sans">Kategori Görseli (Opsiyonel)</label>
+                    <div className="flex gap-1 bg-black/40 p-0.5 rounded-lg border border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setCategoryImageSourceTab("upload")}
+                        className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+                          categoryImageSourceTab === "upload"
+                            ? "bg-bamm-yellow text-black font-black"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        Cihazdan Yükle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCategoryImageSourceTab("url")}
+                        className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+                          categoryImageSourceTab === "url"
+                            ? "bg-bamm-yellow text-black font-black"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        Görsel URL'si
+                      </button>
+                    </div>
+                  </div>
+
+                  {categoryImageSourceTab === "upload" ? (
+                    <div className="space-y-3">
+                      {editingCategory.image && editingCategory.image.startsWith("data:") ? (
+                        <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 p-4 flex items-center gap-4 group">
+                          <div className="w-16 h-16 rounded-xl overflow-hidden bg-black/50 border border-white/10 shrink-0">
+                            <img src={editingCategory.image} className="w-full h-full object-cover" alt="Yüklenen Görsel" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs text-green-400 font-bold block mb-1">Görsel Hazır! ✅</span>
+                            <span className="text-[10px] text-gray-500 block truncate">Cihazınızdaki görsel optimize edilerek kaydedildi.</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCategory(prev => prev ? ({ ...prev, image: "" }) : null)}
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 p-2.5 rounded-xl transition-all border border-red-500/10 active:scale-95"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="relative flex flex-col items-center justify-center border-2 border-dashed border-white/10 hover:border-bamm-yellow/30 bg-black/20 hover:bg-black/40 rounded-2xl p-8 cursor-pointer transition-all text-center group">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (!file.type.startsWith("image/")) {
+                                setCategoryImageUploadError("Lütfen geçerli bir resim seçin.");
+                                return;
+                              }
+                              try {
+                                setCategoryImageUploadLoading(true);
+                                setCategoryImageUploadError("");
+                                const compressed = await compressImage(file);
+                                setEditingCategory(prev => prev ? ({ ...prev, image: compressed }) : null);
+                              } catch (err) {
+                                console.error(err);
+                                setCategoryImageUploadError("Resim yüklenirken hata oluştu.");
+                              } finally {
+                                setCategoryImageUploadLoading(false);
+                              }
+                            }}
+                          />
+                          {categoryImageUploadLoading ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-8 h-8 border-2 border-bamm-yellow border-t-transparent rounded-full animate-spin" />
+                              <span className="text-[11px] font-bold text-gray-400">Görsel Sıkıştırılıyor...</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-12 h-12 rounded-xl bg-white/5 group-hover:bg-bamm-yellow/10 flex items-center justify-center text-gray-400 group-hover:text-bamm-yellow transition-all mb-1 border border-white/5 group-hover:border-bamm-yellow/10">
+                                <Upload size={20} />
+                              </div>
+                              <span className="text-xs font-bold text-gray-300">Görsel Seçmek için Tıklayın</span>
+                              <span className="text-[10px] text-gray-500 max-w-[200px]">PNG, JPG, WEBP (Maksimum 600px genişliğinde optimize edilir)</span>
+                            </div>
+                          )}
+                        </label>
+                      )}
+
+                      {categoryImageUploadError && (
+                        <div className="flex items-center gap-2 text-red-400 text-[11px] justify-center bg-red-400/10 p-3 rounded-xl border border-red-400/10">
+                          <AlertCircle size={14} />
+                          {categoryImageUploadError}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        placeholder="https://gorsel-linki.com/resim.jpg"
+                        value={(editingCategory.image && !editingCategory.image.startsWith("data:")) ? editingCategory.image : ""}
+                        onChange={(e) => setEditingCategory(prev => prev ? ({ ...prev, image: e.target.value }) : null)}
+                        className="flex-1 bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                      />
+                      {editingCategory.image && !editingCategory.image.startsWith("data:") && (
+                        <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl border border-white/10 overflow-hidden bg-black shrink-0">
+                          <img src={editingCategory.image} className="w-full h-full object-cover" alt="Önizleme" referrerPolicy="no-referrer" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {categorySaveError && (
+                <div className="mt-4 flex items-center gap-2 text-red-400 text-[11px] justify-center bg-red-400/10 p-3 rounded-xl border border-red-400/10">
+                  <AlertCircle size={14} />
+                  {categorySaveError}
+                </div>
+              )}
 
               <div className="mt-auto pt-6 border-t border-white/5 flex gap-4 bg-[#16191E] relative z-10">
                 <button
