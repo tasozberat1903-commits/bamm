@@ -20,6 +20,8 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.uid == "xK5gYcZ4kSY7AoNolrCZFL9npSG2" ||
         request.auth.token.email == "bamm@admin.com" ||
+        request.auth.token.email == "berattasoz31@gmail.com" ||
+        request.auth.token.email == "bammyonetici@gmail.com" ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -64,31 +66,12 @@ service cloud.firestore {
 
     match /categories/{categoryId} {
       allow read: if true; // Herkes kategorileri okuyabilir
-      allow create: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming());
-      allow update: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming()) &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'order', 'deleted', 'id', 'image']);
-      allow delete: if isAdmin() && isValidId(categoryId);
+      allow write: if isAdmin(); // Sadece yetkili yöneticiler yazabilir
     }
 
     match /products/{productId} {
-      allow read: if true; // Genel kullanıcılar menüyü görebilir
-      
-      allow create: if isAdmin() && 
-                      isValidId(productId) && (
-                        isValidMenuItem(incoming()) ||
-                        (incoming().keys().size() == 1 && incoming().deleted == true)
-                      );
-      
-      allow update: if isAdmin() && 
-                      isValidId(productId) && (
-                        // Standard valid update
-                        (isValidMenuItem(incoming()) && 
-                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'price', 'category', 'subcategory', 'image', 'isPopular', 'deleted', 'id'])) ||
-                        // Specifically allow setting deleted=true for any valid product ID
-                        (incoming().deleted == true)
-                      );
-      
-      allow delete: if isAdmin() && isValidId(productId);
+      allow read: if true; // Herkes ürünleri okuyabilir
+      allow write: if isAdmin(); // Sadece yetkili yöneticiler yazabilir
     }
 
     match /admins/{userId} {

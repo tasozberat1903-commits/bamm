@@ -6,6 +6,7 @@ import {
   onAuthStateChanged,
   signOut,
   User,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import {
   collection,
@@ -150,6 +151,7 @@ export function AdminPanel() {
   const [categoryImageUploadLoading, setCategoryImageUploadLoading] = useState(false);
   const [categoryImageUploadError, setCategoryImageUploadError] = useState("");
   const [categorySaveError, setCategorySaveError] = useState("");
+  const [productSaveError, setProductSaveError] = useState("");
   const [isSeeding, setIsSeeding] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState<{ id: string; name: string } | null>(null);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
@@ -266,38 +268,68 @@ export function AdminPanel() {
     };
   }, [user]);
 
-  const [usernameInput, setUsernameInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [resetSentMessage, setResetSentMessage] = useState("");
+
+  const handleForgotPassword = async () => {
+    setLoginError("");
+    setResetSentMessage("");
+    if (!emailInput.trim()) {
+      setLoginError("Lütfen şifre sıfırlama bağlantısı göndermek için e-posta adresinizi yazın.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, emailInput.trim());
+      setResetSentMessage("Şifre sıfırlama bağlantısı e-posta adresinize gönderildi!");
+    } catch (error: any) {
+      console.warn("Reset password error:", error);
+      let errMsg = "Şifre sıfırlama e-postası gönderilemedi.";
+      if (error.code === "auth/user-not-found") {
+        errMsg = "Bu e-posta adresine kayıtlı kullanıcı bulunamadı.";
+      } else if (error.code === "auth/invalid-email") {
+        errMsg = "Geçersiz bir e-posta adresi girdiniz.";
+      } else {
+        errMsg = error.message || errMsg;
+      }
+      setLoginError(errMsg);
+    }
+  };
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoginError("");
 
-    if (usernameInput !== "bamm" || passwordInput !== "bamm1616") {
-      setLoginError("Kullanıcı adı veya şifre hatalı.");
+    if (!emailInput.trim() || !passwordInput) {
+      setLoginError("Lütfen e-posta ve şifrenizi girin.");
       return;
     }
 
     try {
-      const dummyEmail = "bamm@admin.com";
-      const dummyPassword = passwordInput + "Secure";
+      await signInWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
+    } catch (error: any) {
+      console.warn("Auth error:", error);
+      let errMsg = "Giriş başarısız oldu.";
 
-      try {
-        await signInWithEmailAndPassword(auth, dummyEmail, dummyPassword);
-      } catch (signInErr: any) {
-        if (signInErr.code === "auth/user-not-found" || signInErr.code === "auth/invalid-credential") {
-          try {
-            await createUserWithEmailAndPassword(auth, dummyEmail, dummyPassword);
-          } catch (createErr: any) {
-            setLoginError("Sistem hatası. Lütfen daha sonra deneyin.");
-          }
-        } else {
-          setLoginError("Giriş başarısız oldu.");
-        }
+      const errCode = error.code || "";
+      const errMessage = error.message || "";
+      const isInvalidCred = 
+        errCode === "auth/user-not-found" || 
+        errCode === "auth/invalid-credential" || 
+        errCode === "auth/wrong-password" ||
+        errMessage.includes("invalid-credential") ||
+        errMessage.includes("user-not-found") ||
+        errMessage.includes("wrong-password");
+
+      if (isInvalidCred) {
+        errMsg = "E-posta veya şifre hatalı.";
+      } else if (errCode === "auth/invalid-email" || errMessage.includes("invalid-email")) {
+        errMsg = "Geçersiz bir e-posta adresi girdiniz.";
+      } else {
+        errMsg = error.message || errMsg;
       }
-    } catch (error) {
-      setLoginError("Bilinmeyen bir hata oluştu.");
+      setLoginError(errMsg);
     }
   };
 
@@ -318,6 +350,7 @@ export function AdminPanel() {
 
   const handleSave = async () => {
     try {
+      setProductSaveError("");
       const cleanData: any = {};
       Object.keys(editForm).forEach((key) => {
         if ((editForm as any)[key] !== undefined) {
@@ -337,8 +370,18 @@ export function AdminPanel() {
       setIsEditing(null);
       setEditForm({});
       clearMenuCaches();
-    } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, "products");
+    } catch (e: any) {
+      console.warn("Product save error:", e);
+      let userFriendlyMessage = "Ürün kaydedilirken bir hata oluştu.";
+      if (e && e.message) {
+        if (e.message.toLowerCase().includes("permission") || e.message.toLowerCase().includes("insufficient")) {
+          userFriendlyMessage = "Yönetici yetkisi hatası veya veritabanı kurallarına uymayan değer girdiniz (Lütfen tüm zorunlu alanları doldurun).";
+        } else {
+          userFriendlyMessage = "Hata: " + e.message;
+        }
+      }
+      setProductSaveError(userFriendlyMessage);
+      handleFirestoreError(e, OperationType.WRITE, "products", false);
     }
   };
 
@@ -475,6 +518,7 @@ export function AdminPanel() {
   const startEdit = (p: MenuItem) => {
     setIsEditing(p.id);
     setEditForm(p);
+    setProductSaveError("");
     if (p.image) {
       const isDataUri = p.image.startsWith("data:");
       setImageSourceTab(isDataUri ? "upload" : "url");
@@ -497,6 +541,7 @@ export function AdminPanel() {
 
   const startNew = () => {
     setIsEditing("new");
+    setProductSaveError("");
     setEditForm({
       name: "",
       price: "",
@@ -577,28 +622,47 @@ export function AdminPanel() {
           
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             <input
-              type="text"
-              placeholder="Kullanıcı Adı"
-              className="px-6 py-4 rounded-2xl bg-black/40 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-bamm-yellow transition-all border border-white/5"
-              value={usernameInput}
-              onChange={(e) => setUsernameInput(e.target.value)}
+              type="email"
+              placeholder="E-posta"
+              className="px-6 py-4 rounded-2xl bg-black/40 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-bamm-yellow transition-all border border-white/5 text-left"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              required
             />
             <input
               type="password"
               placeholder="Şifre"
-              className="px-6 py-4 rounded-2xl bg-black/40 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-bamm-yellow transition-all border border-white/5"
+              className="px-6 py-4 rounded-2xl bg-black/40 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-bamm-yellow transition-all border border-white/5 text-left"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
+              required={!resetSentMessage}
             />
+            
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              className="text-right text-xs text-gray-400 hover:text-bamm-yellow transition-colors self-end pr-2 -mt-1"
+            >
+              Şifremi Unuttum
+            </button>
+
             {loginError && (
-              <div className="flex items-center gap-2 text-red-400 text-xs justify-center bg-red-400/10 py-3 rounded-xl border border-red-400/20">
-                <AlertCircle size={14} />
-                {loginError}
+              <div className="flex items-center gap-2 text-red-400 text-xs justify-center bg-red-400/10 py-3 px-4 rounded-xl border border-red-400/20 text-left">
+                <AlertCircle size={14} className="shrink-0" />
+                <span>{loginError}</span>
               </div>
             )}
+
+            {resetSentMessage && (
+              <div className="flex items-center gap-2 text-green-400 text-xs justify-center bg-green-400/10 py-3 px-4 rounded-xl border border-green-400/20 text-left">
+                <CheckCircle2 size={14} className="shrink-0" />
+                <span>{resetSentMessage}</span>
+              </div>
+            )}
+
             <button
               type="submit"
-              className="bg-bamm-yellow text-black px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-yellow-400 active:scale-95 transition-all mt-4 shadow-xl shadow-bamm-yellow/10"
+              className="bg-bamm-yellow text-black px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-yellow-400 active:scale-95 transition-all mt-2 shadow-xl shadow-bamm-yellow/10"
             >
               Giriş Yap
             </button>
@@ -1310,10 +1374,16 @@ export function AdminPanel() {
                 </div>
               </div>
 
-              <div className="fixed md:relative bottom-4 left-4 right-4 md:bottom-0 md:left-0 md:right-0 flex gap-4 mt-auto">
+              <div className="fixed md:relative bottom-4 left-4 right-4 md:bottom-0 md:left-0 md:right-0 flex flex-col gap-3 mt-auto">
+                {productSaveError && (
+                  <div className="flex items-center gap-2 text-red-400 text-xs justify-center bg-red-400/10 py-3 px-4 rounded-xl border border-red-400/20 text-left w-full">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{productSaveError}</span>
+                  </div>
+                )}
                 <button
                   onClick={handleSave}
-                  className="flex-1 bg-bamm-yellow text-black py-4 md:py-5 rounded-xl md:rounded-2xl font-black uppercase text-[11px] md:text-[13px] tracking-widest active:scale-95 transition-all shadow-xl shadow-bamm-yellow/10"
+                  className="w-full bg-bamm-yellow text-black py-4 md:py-5 rounded-xl md:rounded-2xl font-black uppercase text-[11px] md:text-[13px] tracking-widest active:scale-95 transition-all shadow-xl shadow-bamm-yellow/10"
                 >
                   Değişiklikleri Kaydet
                 </button>
