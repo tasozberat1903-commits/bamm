@@ -2488,8 +2488,8 @@ export const CAMPAIGNS: Campaign[] = [
   {
     id: "c1",
     title: "Happy Hour",
-    description: "HAFTANIN HERGÜNÜ CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 120 TL",
-    image: "https://i.hizliresim.com/3yy76ol.png",
+    description: "HAFTANIN HERGÜNÜ CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 140 TL",
+    image: "https://images.unsplash.com/photo-1538488881038-e252a119ac7c?auto=format&fit=crop&q=80&w=800",
     category: "Biralar"
   },
   {
@@ -2515,7 +2515,7 @@ export const HEROSLIDES: HeroSlide[] = [
     title: "EN SICAK",
     highlight: "HALİ!",
     description: "Taptaze malzemelerle, usta dokunuşlarla hazırlanır.",
-    image: "https://i.hizliresim.com/p4up7ax.jpg",
+    image: "https://i.ibb.co/5WyWMV25/633704765-1231353942398456-5640972076518561394-n.jpg",
     buttonText: "MENÜYE GİT"
   },
   {
@@ -2523,8 +2523,8 @@ export const HEROSLIDES: HeroSlide[] = [
     subtitle: "HAFTANIN HER GÜNÜ",
     title: "HAPPY",
     highlight: "HOUR!",
-    description: "CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 120 TL",
-    image: "https://i.hizliresim.com/3yy76ol.png",
+    description: "CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 140 TL",
+    image: "https://images.unsplash.com/photo-1538488881038-e252a119ac7c?auto=format&fit=crop&q=80&w=800",
     buttonText: "MENÜYE GİT"
   },
   {

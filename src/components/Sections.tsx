@@ -24,6 +24,9 @@ import {
   Sandwich,
   CupSoda,
   Beef,
+  Drumstick,
+  Egg,
+  Sparkles,
   ChevronLeft,
   MoreVertical,
   Minus,
@@ -95,7 +98,7 @@ export function Header({
           className={`w-14 h-14 ${isLight ? "bg-white" : "bg-bamm-black"} rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,215,0,0.15)] overflow-hidden border ${isLight ? "border-black/5" : "border-white/10"} cursor-pointer active:scale-90 transition-transform`}
         >
           <img
-            src="https://i.hizliresim.com/guz3g2u.jpg"
+            src="/logo.jpg"
             alt="BAMM Garden Logo"
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
@@ -560,7 +563,7 @@ export function HomeSection({
           {[
             {
               name: "Kokteyller",
-              img: "https://i.hizliresim.com/cvn2hrd.png",
+              img: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&q=80&w=600",
               color: "#A855F7",
             },
             {
@@ -1027,7 +1030,7 @@ export function MenuSection({
             className="relative h-[220px] rounded-[24px] overflow-hidden flex flex-col justify-center shadow-[0_12px_32px_rgba(0,0,0,0.15)] cursor-pointer active:scale-[0.98] transition-all"
           >
             <img
-              src="https://i.hizliresim.com/3yy76ol.png"
+              src="https://images.unsplash.com/photo-1535958636474-b021ee887b13?auto=format&fit=crop&q=80&w=800"
               alt="Happy Hour"
               className="absolute inset-0 w-full h-full object-cover object-center"
               referrerPolicy="no-referrer"
@@ -1075,7 +1078,7 @@ export function MenuSection({
                   className="text-bamm-yellow text-[22px] sm:text-[30px] font-black italic tracking-tighter leading-none uppercase" 
                   style={{ transform: 'scaleY(1.1)', transformOrigin: 'bottom left', fontFamily: 'Impact, sans-serif' }}
                 >
-                  TUBORG ŞİŞE 120 TL
+                  TUBORG ŞİŞE 140 TL
                 </span>
               </div>
             </div>
@@ -1182,21 +1185,26 @@ export function MenuSection({
         </div>
 
         {categorySubcategories.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
-            {["Tümü", ...categorySubcategories].map((subcat) => (
-              <button
-                key={subcat}
-                onClick={() => setSelectedSubcategory(subcat)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 border ${
-                  selectedSubcategory === subcat
-                    ? "bg-bamm-yellow text-black border-bamm-yellow shadow-sm"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {subcat === "Tümü" && <ListFilter size={16} />}
-                {subcat}
-              </button>
-            ))}
+          <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
+            {["Tümü", ...categorySubcategories].map((subcat) => {
+              const isActive = selectedSubcategory === subcat;
+              return (
+                <button
+                  key={subcat}
+                  onClick={() => setSelectedSubcategory(subcat)}
+                  className={`flex items-center gap-2 px-4.5 py-2.5 rounded-full text-[12px] md:text-[13px] font-extrabold uppercase tracking-wider whitespace-nowrap transition-all duration-300 border ${
+                    isActive
+                      ? "bg-bamm-yellow text-black border-bamm-yellow shadow-md shadow-bamm-yellow/20 scale-105"
+                      : "bg-white text-gray-700 border-gray-200/80 hover:bg-gray-50 hover:border-gray-300 active:scale-95 shadow-sm"
+                  }`}
+                >
+                  {subcat === "Tümü" && (
+                    <ListFilter size={14} className={isActive ? "text-black shrink-0" : "text-gray-500 shrink-0"} />
+                  )}
+                  <span>{subcat}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -1545,7 +1553,7 @@ export function InfoModal({
                 <div className="w-20 h-20 rounded-2xl bg-[#0A0A0A] p-1 border border-white/10 shadow-xl mb-4">
                   <div className="w-full h-full rounded-xl bg-black overflow-hidden relative group">
                     <img
-                      src="https://i.hizliresim.com/guz3g2u.jpg"
+                      src="/logo.jpg"
                       alt="BAMM Logo"
                       className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-500"
                       referrerPolicy="no-referrer"
@@ -1688,7 +1696,7 @@ export function ContactSection({
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-bamm-yellow/20 to-transparent p-1 mb-4 sm:mb-6 mt-2 shrink-0 border border-bamm-yellow/10">
             <div className="w-full h-full rounded-full bg-bamm-black overflow-hidden border-2 border-bamm-yellow/20 shadow-[0_0_40px_rgba(255,215,0,0.15)] flex items-center justify-center">
               <img
-                src="https://i.hizliresim.com/guz3g2u.jpg"
+                src="/logo.jpg"
                 alt="BAMM"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"

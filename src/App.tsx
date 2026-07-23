@@ -121,7 +121,7 @@ export default function App() {
               className="w-32 h-32 bg-bamm-black rounded-full flex items-center justify-center mb-10 overflow-hidden shadow-[0_0_40px_rgba(255,215,0,0.1)]"
             >
               <img
-                src="https://i.hizliresim.com/guz3g2u.jpg"
+                src="/logo.jpg"
                 alt="Logo"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
