@@ -2488,8 +2488,8 @@ export const CAMPAIGNS: Campaign[] = [
   {
     id: "c1",
     title: "Happy Hour",
-    description: "HAFTANIN HERGÜNÜ CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 140 TL",
-    image: "https://images.unsplash.com/photo-1538488881038-e252a119ac7c?auto=format&fit=crop&q=80&w=800",
+    description: "HAFTANIN HERGÜNÜ CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 150 TL",
+    image: "/happy-hour.jpg",
     category: "Biralar"
   },
   {
@@ -2523,8 +2523,8 @@ export const HEROSLIDES: HeroSlide[] = [
     subtitle: "HAFTANIN HER GÜNÜ",
     title: "HAPPY",
     highlight: "HOUR!",
-    description: "CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 140 TL",
-    image: "https://images.unsplash.com/photo-1538488881038-e252a119ac7c?auto=format&fit=crop&q=80&w=800",
+    description: "CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 150 TL",
+    image: "/happy-hour.jpg",
     buttonText: "MENÜYE GİT"
   },
   {

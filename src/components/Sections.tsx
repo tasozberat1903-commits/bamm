@@ -1030,7 +1030,7 @@ export function MenuSection({
             className="relative h-[220px] rounded-[24px] overflow-hidden flex flex-col justify-center shadow-[0_12px_32px_rgba(0,0,0,0.15)] cursor-pointer active:scale-[0.98] transition-all"
           >
             <img
-              src="https://images.unsplash.com/photo-1535958636474-b021ee887b13?auto=format&fit=crop&q=80&w=800"
+              src="/happy-hour.jpg"
               alt="Happy Hour"
               className="absolute inset-0 w-full h-full object-cover object-center"
               referrerPolicy="no-referrer"
@@ -1078,7 +1078,7 @@ export function MenuSection({
                   className="text-bamm-yellow text-[22px] sm:text-[30px] font-black italic tracking-tighter leading-none uppercase" 
                   style={{ transform: 'scaleY(1.1)', transformOrigin: 'bottom left', fontFamily: 'Impact, sans-serif' }}
                 >
-                  TUBORG ŞİŞE 140 TL
+                  TUBORG ŞİŞE 150 TL
                 </span>
               </div>
             </div>
