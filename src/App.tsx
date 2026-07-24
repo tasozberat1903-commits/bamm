@@ -121,7 +121,7 @@ export default function App() {
               className="w-32 h-32 bg-bamm-black rounded-full flex items-center justify-center mb-10 overflow-hidden shadow-[0_0_40px_rgba(255,215,0,0.1)]"
             >
               <img
-                src="/logo.jpg"
+                src="https://i.ibb.co/3ytdjqqM/306337556-429892355877956-707020667180952216-n.jpg"
                 alt="Logo"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"

@@ -98,7 +98,7 @@ export function Header({
           className={`w-14 h-14 ${isLight ? "bg-white" : "bg-bamm-black"} rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,215,0,0.15)] overflow-hidden border ${isLight ? "border-black/5" : "border-white/10"} cursor-pointer active:scale-90 transition-transform`}
         >
           <img
-            src="/logo.jpg"
+            src="https://i.ibb.co/3ytdjqqM/306337556-429892355877956-707020667180952216-n.jpg"
             alt="BAMM Garden Logo"
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
@@ -1030,7 +1030,7 @@ export function MenuSection({
             className="relative h-[220px] rounded-[24px] overflow-hidden flex flex-col justify-center shadow-[0_12px_32px_rgba(0,0,0,0.15)] cursor-pointer active:scale-[0.98] transition-all"
           >
             <img
-              src="/happy-hour.jpg"
+              src="https://images.pexels.com/photos/159291/beer-machine-alcohol-brewery-159291.jpeg?auto=compress&cs=tinysrgb&w=800"
               alt="Happy Hour"
               className="absolute inset-0 w-full h-full object-cover object-center"
               referrerPolicy="no-referrer"
@@ -1553,7 +1553,7 @@ export function InfoModal({
                 <div className="w-20 h-20 rounded-2xl bg-[#0A0A0A] p-1 border border-white/10 shadow-xl mb-4">
                   <div className="w-full h-full rounded-xl bg-black overflow-hidden relative group">
                     <img
-                      src="/logo.jpg"
+                      src="https://i.ibb.co/3ytdjqqM/306337556-429892355877956-707020667180952216-n.jpg"
                       alt="BAMM Logo"
                       className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-500"
                       referrerPolicy="no-referrer"
@@ -1696,7 +1696,7 @@ export function ContactSection({
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-bamm-yellow/20 to-transparent p-1 mb-4 sm:mb-6 mt-2 shrink-0 border border-bamm-yellow/10">
             <div className="w-full h-full rounded-full bg-bamm-black overflow-hidden border-2 border-bamm-yellow/20 shadow-[0_0_40px_rgba(255,215,0,0.15)] flex items-center justify-center">
               <img
-                src="/logo.jpg"
+                src="https://i.ibb.co/3ytdjqqM/306337556-429892355877956-707020667180952216-n.jpg"
                 alt="BAMM"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"

@@ -2489,7 +2489,7 @@ export const CAMPAIGNS: Campaign[] = [
     id: "c1",
     title: "Happy Hour",
     description: "HAFTANIN HERGÜNÜ CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 150 TL",
-    image: "/happy-hour.jpg",
+    image: "https://images.pexels.com/photos/159291/beer-machine-alcohol-brewery-159291.jpeg?auto=compress&cs=tinysrgb&w=800",
     category: "Biralar"
   },
   {
@@ -2524,7 +2524,7 @@ export const HEROSLIDES: HeroSlide[] = [
     title: "HAPPY",
     highlight: "HOUR!",
     description: "CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 150 TL",
-    image: "/happy-hour.jpg",
+    image: "https://images.pexels.com/photos/159291/beer-machine-alcohol-brewery-159291.jpeg?auto=compress&cs=tinysrgb&w=800",
     buttonText: "MENÜYE GİT"
   },
   {
