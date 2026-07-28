@@ -26,7 +26,7 @@ import {
   Nfc, 
   ChevronDown, 
   Search, 
-  LayoutDashboard, 
+   
   Utensils, 
   Settings, 
   AlertCircle,
@@ -144,7 +144,7 @@ export function AdminPanel() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [nfcStatus, setNfcStatus] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "categories" | "settings">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "categories" | "settings">("products");
   const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string; image?: string; deleted?: boolean }[]>([]);
   const [editingCategory, setEditingCategory] = useState<{ id: string | null; name: string; description: string; order: number; image?: string } | null>(null);
   const [categoryImageSourceTab, setCategoryImageSourceTab] = useState<"upload" | "url">("upload");
@@ -637,14 +637,6 @@ export function AdminPanel() {
               onChange={(e) => setPasswordInput(e.target.value)}
               required={!resetSentMessage}
             />
-            
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="text-right text-xs text-gray-400 hover:text-bamm-yellow transition-colors self-end pr-2 -mt-1"
-            >
-              Şifremi Unuttum
-            </button>
 
             {loginError && (
               <div className="flex items-center gap-2 text-red-400 text-xs justify-center bg-red-400/10 py-3 px-4 rounded-xl border border-red-400/20 text-left">
@@ -689,7 +681,6 @@ export function AdminPanel() {
         
         <nav className="flex-1 px-4 space-y-2">
           {[
-            { id: "dashboard", icon: LayoutDashboard, label: "Hızlı Özet" },
             { id: "products", icon: Utensils, label: "Ürünler" },
             { id: "categories", icon: FolderOpen, label: "Kategoriler" },
             { id: "settings", icon: Settings, label: "Sistem" },
@@ -723,7 +714,6 @@ export function AdminPanel() {
       {/* Bottom Navigation - Mobile */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#121418] border-t border-white/5 px-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         {[
-          { id: "dashboard", icon: LayoutDashboard, label: "Özet" },
           { id: "products", icon: Utensils, label: "Ürünler" },
           { id: "categories", icon: FolderOpen, label: "Kategori" },
           { id: "settings", icon: Settings, label: "Ayarlar" },
@@ -923,39 +913,6 @@ export function AdminPanel() {
                       </div>
                    </div>
                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "dashboard" && (
-          <div className="p-4 md:p-12">
-            <h1 className="text-2xl md:text-3xl font-black text-white mb-2 uppercase tracking-tighter italic leading-none">Hoş Geldiniz,<br className="md:hidden" /> <span className="text-bamm-yellow">BAMM!</span></h1>
-            <p className="text-gray-500 text-xs md:text-sm mb-8 md:mb-12">İşletmenizin performansına kısa bir bakış.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-              <div className="bg-[#16191E] p-6 md:p-10 rounded-3xl md:rounded-[48px] border border-white/5 shadow-xl">
-                <h3 className="font-bold text-white mb-4 text-sm md:text-base">Sistem Durumu</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center text-xs md:text-sm py-3 border-b border-white/5">
-                    <span className="text-gray-400">Veritabanı</span>
-                    <span className="text-green-400 font-bold">Aktif</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs md:text-sm py-3 border-b border-white/5">
-                    <span className="text-gray-400">Görüntüleme</span>
-                    <span className="text-white font-bold">1,240</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs md:text-sm py-3 border-b border-white/5">
-                    <span className="text-gray-400">Versiyon</span>
-                    <span className="text-gray-600">v2.1.0</span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-bamm-yellow p-6 md:p-10 rounded-3xl md:rounded-[48px] shadow-xl shadow-bamm-yellow/5">
-                <h3 className="font-black text-black mb-4 uppercase tracking-wider text-sm md:text-base">Duyuru</h3>
-                <p className="text-black/70 text-xs md:text-sm leading-relaxed font-medium">
-                  Menüdeki fiyatları güncelledikten sonra NFC etiketlerini kontrol etmeyi unutmayın. 
-                  Bir sonraki güncellemede sipariş takip sistemi eklenecektir.
-                </p>
               </div>
             </div>
           </div>

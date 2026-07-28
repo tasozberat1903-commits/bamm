@@ -1902,9 +1902,6 @@ export function ProductDetail({
             <div className="mb-6">
               <p className="text-gray-500 text-[13px] leading-[1.8] font-medium">
                 {product.description}
-                {
-                  " Özenle seçilmiş malzemelerle hazırlanan bu eşsiz lezzet, her lokmada size BAMM Garden kalitesini hissettirmek üzere tasarlandı."
-                }
               </p>
             </div>
           </div>
