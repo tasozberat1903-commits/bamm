@@ -137,24 +137,67 @@ export function SearchModal({
   onProductClick: (item: MenuItem) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [products, setProducts] = useState<MenuItem[]>(MENU_DATA);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    } else {
+    if (!isOpen) {
       setQuery("");
+      return;
     }
+
+    setTimeout(() => inputRef.current?.focus(), 100);
+
+    const loadProducts = async () => {
+      try {
+        const cachedData = localStorage.getItem("bamm_products_cache");
+        if (cachedData) {
+          setProducts(JSON.parse(cachedData));
+        }
+
+        const snap = await getDocs(collection(db, "products"));
+        let dbProducts: any[] = [];
+        if (!snap.empty) {
+          dbProducts = snap.docs.map((doc) => {
+            const data = doc.data() as any;
+            if (["Burgerler", "Pizzalar", "Makarnalar", "Dürümler & Bowl", "Ana Yemekler"].includes(data.category)) {
+              data.subcategory = data.category === "Dürümler & Bowl" ? "Wrapler" : (data.category === "Ana Yemekler" ? "Beyaz Etler" : data.category);
+              data.category = "Yemekler";
+            } else if (data.category === "Tost & Sandviç") {
+              data.subcategory = "Tostlar";
+              data.category = "Kahvaltı";
+            }
+            return { id: doc.id, ...data };
+          });
+        }
+
+        const merged = [...MENU_DATA];
+        dbProducts.forEach((dbP) => {
+          const idx = merged.findIndex((m) => m.id === dbP.id);
+          if (idx !== -1) merged[idx] = dbP;
+          else merged.push(dbP);
+        });
+
+        const filteredLiveMenu = merged.filter((p) => !p.deleted);
+        setProducts(filteredLiveMenu);
+        localStorage.setItem("bamm_products_cache", JSON.stringify(filteredLiveMenu));
+        localStorage.setItem("bamm_products_cache_time", String(Date.now()));
+      } catch (error) {
+        console.warn("SearchModal products fetch error:", error);
+      }
+    };
+
+    loadProducts();
   }, [isOpen]);
 
   const results =
     query.trim() === ""
       ? []
-      : MENU_DATA.filter(
+      : products.filter(
           (item) =>
             item.name.toLowerCase().includes(query.toLowerCase()) ||
-            item.description.toLowerCase().includes(query.toLowerCase()) ||
-            item.category.toLowerCase().includes(query.toLowerCase()),
+            (item.description && item.description.toLowerCase().includes(query.toLowerCase())) ||
+            (item.category && item.category.toLowerCase().includes(query.toLowerCase())),
         ).slice(0, 8);
 
   return (
