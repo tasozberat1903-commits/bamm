@@ -39,7 +39,13 @@ import {
   ArrowUp,
   ArrowDown,
   FolderOpen,
-  WifiOff
+  WifiOff,
+  MessageSquare,
+  Eye,
+  EyeOff,
+  Clock,
+  Filter,
+  Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -135,6 +141,15 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   }
 }
 
+export interface FeedbackItem {
+  id: string;
+  type: "Öneri" | "Şikayet" | "Teşekkür" | "Diğer";
+  rating?: number | null;
+  message: string;
+  createdAt?: any;
+  status?: "unread" | "read";
+}
+
 export function AdminPanel() {
   const [user, setUser] = useState<User | null>(null);
   const [products, setProducts] = useState<MenuItem[]>(MENU_DATA);
@@ -144,7 +159,7 @@ export function AdminPanel() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [nfcStatus, setNfcStatus] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"products" | "categories" | "settings">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "categories" | "feedback" | "settings">("products");
   const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string; image?: string; deleted?: boolean }[]>([]);
   const [editingCategory, setEditingCategory] = useState<{ id: string | null; name: string; description: string; order: number; image?: string } | null>(null);
   const [categoryImageSourceTab, setCategoryImageSourceTab] = useState<"upload" | "url">("upload");
@@ -155,6 +170,11 @@ export function AdminPanel() {
   const [isSeeding, setIsSeeding] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState<{ id: string; name: string } | null>(null);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
+
+  const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
+  const [selectedFeedbackFilter, setSelectedFeedbackFilter] = useState<string>("Tümü");
+  const [feedbackSearch, setFeedbackSearch] = useState("");
+  const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null);
 
   const availableCategories = dbCategories.length > 0 ? dbCategories.map(c => c.name) : CATEGORIES;
 
@@ -267,6 +287,64 @@ export function AdminPanel() {
       }
     };
   }, [user]);
+
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "feedback"), (snap) => {
+        if (!snap.empty) {
+          const list = snap.docs.map(
+            (doc) => ({ id: doc.id, ...doc.data() }) as FeedbackItem,
+          );
+          list.sort((a, b) => {
+            const getTime = (val: any) => {
+              if (!val) return Date.now();
+              if (typeof val.toMillis === "function") return val.toMillis();
+              if (typeof val.seconds === "number") return val.seconds * 1000;
+              if (typeof val === "number") return val;
+              if (val instanceof Date) return val.getTime();
+              return Date.now();
+            };
+            return getTime(b.createdAt) - getTime(a.createdAt);
+          });
+          setFeedbackList(list);
+        } else {
+          setFeedbackList([]);
+        }
+      }, (error) => {
+        console.warn("Feedback listener error:", error);
+      });
+    } catch (e) {
+      console.warn("Failed to initialize feedback listener:", e);
+    }
+    return () => {
+      if (unsub) {
+        try { unsub(); } catch (e) {}
+      }
+    };
+  }, []);
+
+  const toggleFeedbackStatus = async (item: FeedbackItem) => {
+    try {
+      const newStatus = item.status === "read" ? "unread" : "read";
+      await setDoc(doc(db, "feedback", item.id), { status: newStatus }, { merge: true });
+    } catch (e) {
+      console.error("Error toggling feedback status:", e);
+    }
+  };
+
+  const confirmDeleteFeedback = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "feedback", id));
+      setDeletingFeedbackId(null);
+    } catch (e) {
+      console.error("Error deleting feedback:", e);
+    }
+  };
+
+  const unreadFeedbackCount = useMemo(() => {
+    return feedbackList.filter((f) => f.status === "unread" || !f.status).length;
+  }, [feedbackList]);
 
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
@@ -683,19 +761,33 @@ export function AdminPanel() {
           {[
             { id: "products", icon: Utensils, label: "Ürünler" },
             { id: "categories", icon: FolderOpen, label: "Kategoriler" },
+            { id: "feedback", icon: MessageSquare, label: "Geri Bildirim", badge: unreadFeedbackCount },
             { id: "settings", icon: Settings, label: "Sistem" },
           ].map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id as any)}
-              className={`w-full flex items-center gap-3 px-4 py-4 rounded-2xl transition-all group ${
+              className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl transition-all group ${
                 activeTab === item.id 
                   ? "bg-bamm-yellow text-black font-bold shadow-lg shadow-bamm-yellow/5" 
                   : "text-gray-500 hover:bg-white/5 hover:text-white"
               }`}
             >
-              <item.icon size={20} />
-              <span className="text-sm">{item.label}</span>
+              <div className="flex items-center gap-3">
+                <item.icon size={20} />
+                <span className="text-sm">{item.label}</span>
+              </div>
+              {item.badge ? (
+                <span
+                  className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                    activeTab === item.id
+                      ? "bg-black text-bamm-yellow"
+                      : "bg-bamm-yellow text-black"
+                  }`}
+                >
+                  {item.badge}
+                </span>
+              ) : null}
             </button>
           ))}
         </nav>
@@ -712,10 +804,11 @@ export function AdminPanel() {
       </div>
 
       {/* Bottom Navigation - Mobile */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#121418] border-t border-white/5 px-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#121418] border-t border-white/5 px-4 pt-3 pb-[calc(1.2rem+env(safe-area-inset-bottom))] flex items-center justify-around shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         {[
           { id: "products", icon: Utensils, label: "Ürünler" },
           { id: "categories", icon: FolderOpen, label: "Kategori" },
+          { id: "feedback", icon: MessageSquare, label: "Bildirim", badge: unreadFeedbackCount },
           { id: "settings", icon: Settings, label: "Ayarlar" },
         ].map((item) => {
           const isActive = activeTab === item.id;
@@ -723,18 +816,25 @@ export function AdminPanel() {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id as any)}
-              className={`flex flex-col items-center gap-1.5 transition-all relative ${
-                isActive ? "text-bamm-yellow scale-110" : "text-gray-500 hover:text-white"
+              className={`flex flex-col items-center gap-1 transition-all relative ${
+                isActive ? "text-bamm-yellow scale-105" : "text-gray-500 hover:text-white"
               }`}
             >
-              <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-              <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isActive ? "opacity-100" : "opacity-60"}`}>
+              <div className="relative">
+                <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                {item.badge ? (
+                  <span className="absolute -top-1.5 -right-2 bg-bamm-yellow text-black font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center border border-[#121418]">
+                    {item.badge}
+                  </span>
+                ) : null}
+              </div>
+              <span className={`text-[9px] font-black uppercase tracking-[0.05em] ${isActive ? "opacity-100" : "opacity-60"}`}>
                 {item.label}
               </span>
               {isActive && (
                 <motion.div 
                   layoutId="adminTabIndicator"
-                  className="absolute -bottom-2 w-1 h-1 bg-bamm-yellow rounded-full"
+                  className="absolute -bottom-1.5 w-1 h-1 bg-bamm-yellow rounded-full"
                 />
               )}
             </button>
@@ -1010,6 +1110,241 @@ export function AdminPanel() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === "feedback" && (
+          <div className="p-4 md:p-12">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-black text-white mb-2 uppercase tracking-tighter italic">
+                  Görüş & Şikayetler
+                </h1>
+                <p className="text-gray-500 text-xs md:text-sm">
+                  Müşterilerinizden gelen %100 anonim geri bildirimler.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Stats Bar */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 md:mb-10">
+              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5">
+                <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">
+                  Toplam Mesaj
+                </p>
+                <h4 className="text-xl md:text-2xl font-black text-white">
+                  {feedbackList.length}
+                </h4>
+              </div>
+              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5">
+                <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">
+                  Yeni / Okunmamış
+                </p>
+                <h4 className="text-xl md:text-2xl font-black text-bamm-yellow">
+                  {unreadFeedbackCount}
+                </h4>
+              </div>
+              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5">
+                <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">
+                  💡 Öneri
+                </p>
+                <h4 className="text-xl md:text-2xl font-black text-blue-400">
+                  {feedbackList.filter((f) => f.type === "Öneri").length}
+                </h4>
+              </div>
+              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5">
+                <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">
+                  ⚠️ Şikayet
+                </p>
+                <h4 className="text-xl md:text-2xl font-black text-red-400">
+                  {feedbackList.filter((f) => f.type === "Şikayet").length}
+                </h4>
+              </div>
+            </div>
+
+            <div className="bg-[#16191E] rounded-3xl md:rounded-[40px] border border-white/5 overflow-hidden shadow-2xl">
+              {/* Toolbar */}
+              <div className="p-4 md:p-6 border-b border-white/5 flex flex-col md:flex-row gap-4 items-center justify-between bg-white/[0.01]">
+                <div className="flex gap-2 p-1 bg-black/40 rounded-2xl overflow-x-auto no-scrollbar w-full md:w-auto">
+                  {["Tümü", "Okunmamış", "Öneri", "Şikayet", "Teşekkür", "Diğer"].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedFeedbackFilter(cat)}
+                      className={`px-4 md:px-5 py-2 rounded-xl text-[10px] md:text-xs font-bold whitespace-nowrap transition-all ${
+                        selectedFeedbackFilter === cat
+                          ? "bg-bamm-yellow text-black shadow-lg scale-105"
+                          : "text-gray-500 hover:text-white"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative w-full md:w-64">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Mesajlarda Ara..."
+                    className="w-full bg-black/40 border-none rounded-xl md:rounded-2xl py-3 pl-10 md:pl-12 pr-4 text-xs md:text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                    value={feedbackSearch}
+                    onChange={(e) => setFeedbackSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Feedback List */}
+              <div className="p-4 md:p-6 space-y-4">
+                {feedbackList
+                  .filter((item) => {
+                    let matchesFilter = true;
+                    if (selectedFeedbackFilter === "Okunmamış") {
+                      matchesFilter = item.status === "unread" || !item.status;
+                    } else if (selectedFeedbackFilter !== "Tümü") {
+                      matchesFilter = item.type === selectedFeedbackFilter;
+                    }
+
+                    let matchesQuery = true;
+                    if (feedbackSearch.trim()) {
+                      matchesQuery =
+                        item.message.toLowerCase().includes(feedbackSearch.toLowerCase()) ||
+                        item.type.toLowerCase().includes(feedbackSearch.toLowerCase());
+                    }
+
+                    return matchesFilter && matchesQuery;
+                  })
+                  .length === 0 ? (
+                  <div className="text-center py-16 text-gray-500">
+                    <MessageSquare size={40} className="mx-auto mb-3 opacity-20" />
+                    <p className="text-sm font-bold">Geri bildirim bulunamadı.</p>
+                  </div>
+                ) : (
+                  feedbackList
+                    .filter((item) => {
+                      let matchesFilter = true;
+                      if (selectedFeedbackFilter === "Okunmamış") {
+                        matchesFilter = item.status === "unread" || !item.status;
+                      } else if (selectedFeedbackFilter !== "Tümü") {
+                        matchesFilter = item.type === selectedFeedbackFilter;
+                      }
+
+                      let matchesQuery = true;
+                      if (feedbackSearch.trim()) {
+                        matchesQuery =
+                          item.message.toLowerCase().includes(feedbackSearch.toLowerCase()) ||
+                          item.type.toLowerCase().includes(feedbackSearch.toLowerCase());
+                      }
+
+                      return matchesFilter && matchesQuery;
+                    })
+                    .map((item) => {
+                      const isUnread = item.status === "unread" || !item.status;
+                      const formattedDate = item.createdAt?.toDate
+                        ? item.createdAt.toDate().toLocaleString("tr-TR", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : item.createdAt?.seconds
+                        ? new Date(item.createdAt.seconds * 1000).toLocaleString("tr-TR", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "Yeni";
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={`p-5 md:p-6 rounded-2xl md:rounded-3xl border transition-all ${
+                            isUnread
+                              ? "bg-bamm-yellow/[0.03] border-bamm-yellow/30 shadow-lg shadow-bamm-yellow/5"
+                              : "bg-white/[0.02] border-white/5 opacity-80"
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <span
+                                className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-lg border ${
+                                  item.type === "Şikayet"
+                                    ? "bg-red-500/20 text-red-400 border-red-500/30"
+                                    : item.type === "Öneri"
+                                    ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                    : item.type === "Teşekkür"
+                                    ? "bg-green-500/20 text-green-400 border-green-500/30"
+                                    : "bg-gray-500/20 text-gray-300 border-gray-500/30"
+                                }`}
+                              >
+                                {item.type}
+                              </span>
+
+                              {isUnread && (
+                                <span className="text-[9px] font-black uppercase tracking-widest bg-bamm-yellow text-black px-2.5 py-1 rounded-lg animate-pulse">
+                                  YENİ
+                                </span>
+                              )}
+
+                              {item.rating ? (
+                                <div className="flex items-center gap-1 bg-black/40 px-2.5 py-1 rounded-lg border border-white/5">
+                                  <Star size={12} className="text-bamm-yellow fill-bamm-yellow" />
+                                  <span className="text-xs font-bold text-white">{item.rating}/5 Yıldız</span>
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="flex items-center gap-3 text-xs text-gray-500">
+                              <div className="flex items-center gap-1.5">
+                                <Clock size={13} />
+                                <span>{formattedDate}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Message content */}
+                          <div className="bg-black/30 p-4 rounded-xl border border-white/5 text-gray-200 text-sm leading-relaxed mb-4 whitespace-pre-wrap">
+                            "{item.message}"
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
+                            <button
+                              onClick={() => toggleFeedbackStatus(item)}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                isUnread
+                                  ? "bg-white/10 hover:bg-white/20 text-white border-white/10"
+                                  : "bg-white/5 hover:bg-white/10 text-gray-400 border-white/5"
+                              }`}
+                            >
+                              {isUnread ? (
+                                <>
+                                  <Eye size={14} className="text-bamm-yellow" />
+                                  <span>Okundu İşaretle</span>
+                                </>
+                              ) : (
+                                <>
+                                  <EyeOff size={14} />
+                                  <span>Okunmadı Yap</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              onClick={() => setDeletingFeedbackId(item.id)}
+                              className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all border border-transparent hover:border-red-500/20"
+                              title="Mesajı Sil"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1574,6 +1909,23 @@ export function AdminPanel() {
               <div className="flex flex-col gap-3">
                 <button onClick={() => deleteCategory(deletingCategory.id)} className="w-full bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-red-500/20 active:scale-95 transition-all">Evet, Sil</button>
                 <button onClick={() => setDeletingCategory(null)} className="w-full bg-white/5 text-gray-400 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:text-white transition-colors">Vazgeç</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Feedback Delete Confirmation */}
+      <AnimatePresence>
+        {deletingFeedbackId && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setDeletingFeedbackId(null)} />
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative bg-[#1A1D23] p-10 rounded-[48px] border border-white/10 shadow-2xl w-full max-w-sm text-center">
+              <div className="w-20 h-20 bg-red-500/10 rounded-[32px] flex items-center justify-center mx-auto mb-8 text-red-500"><Trash2 size={32} /></div>
+              <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter italic leading-none">Geri Bildirimi<br />Sil?</h2>
+              <p className="text-sm text-gray-500 mb-10">Bu mesaj kalıcı olarak silinecektir.</p>
+              <div className="flex flex-col gap-3">
+                <button onClick={() => confirmDeleteFeedback(deletingFeedbackId)} className="w-full bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-red-500/20 active:scale-95 transition-all">Evet, Sil</button>
+                <button onClick={() => setDeletingFeedbackId(null)} className="w-full bg-white/5 text-gray-400 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:text-white transition-colors">Vazgeç</button>
               </div>
             </motion.div>
           </div>

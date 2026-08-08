@@ -49,6 +49,9 @@ import {
   Menu as MenuIcon,
   BadgePercent,
   Calendar,
+  MessageSquare,
+  Send,
+  AlertCircle,
 } from "lucide-react";
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { CATEGORIES, MENU_DATA, MenuItem, CAMPAIGNS, EVENTS, HEROSLIDES, HeroSlide } from "../data";
@@ -70,11 +73,13 @@ export function Header({
   onSearchClick,
   onAdminClick,
   onLogoClick,
+  onFeedbackClick,
 }: {
   isLight?: boolean;
   onSearchClick: () => void;
   onAdminClick?: () => void;
   onLogoClick?: () => void;
+  onFeedbackClick?: () => void;
 }) {
   return (
     <header
@@ -107,16 +112,26 @@ export function Header({
       </div>
 
       <div className="flex gap-2 relative z-10">
+        {onFeedbackClick && (
+          <button
+            onClick={onFeedbackClick}
+            title="Öneri & Şikayet"
+            className="relative px-3 py-1.5 bg-bamm-yellow text-black rounded-full flex items-center gap-1.5 shadow-md shadow-bamm-yellow/20 active:scale-95 transition-all font-black text-xs cursor-pointer"
+          >
+            <MessageSquare size={14} strokeWidth={2.5} />
+            <span className="text-[10px] uppercase font-black tracking-wider">Görüş Bildir</span>
+          </button>
+        )}
         <button
           onClick={onSearchClick}
-          className={`w-9 h-9 ${isLight ? "bg-black/[0.03]" : "bg-white/5"} rounded-full flex items-center justify-center border ${isLight ? "border-black/5" : "border-white/10"} ${isLight ? "text-gray-400" : "text-gray-400"} active:scale-95 transition-transform`}
+          className={`w-9 h-9 ${isLight ? "bg-black/[0.03]" : "bg-white/5"} rounded-full flex items-center justify-center border ${isLight ? "border-black/5" : "border-white/10"} ${isLight ? "text-gray-600" : "text-gray-400"} active:scale-95 transition-transform`}
         >
           <Search size={14} strokeWidth={1.5} />
         </button>
         {onAdminClick && (
           <button
             onClick={onAdminClick}
-            className={`w-9 h-9 ${isLight ? "bg-black/[0.03]" : "bg-white/5"} rounded-full flex items-center justify-center border ${isLight ? "border-black/5" : "border-white/10"} ${isLight ? "text-gray-400" : "text-gray-400"} active:scale-95 transition-transform`}
+            className={`w-9 h-9 ${isLight ? "bg-black/[0.03]" : "bg-white/5"} rounded-full flex items-center justify-center border ${isLight ? "border-black/5" : "border-white/10"} ${isLight ? "text-gray-600" : "text-gray-400"} active:scale-95 transition-transform`}
           >
             <Lock size={14} strokeWidth={1.5} />
           </button>
@@ -283,6 +298,233 @@ export function SearchModal({
             )}
           </div>
         </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// --- Feedback Modal ---
+export function FeedbackModal({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const [feedbackType, setFeedbackType] = useState<"Öneri" | "Şikayet" | "Teşekkür" | "Diğer">("Öneri");
+  const [rating, setRating] = useState<number>(0);
+  const [hoverRating, setHoverRating] = useState<number>(0);
+  const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    if (!message.trim() || message.trim().length < 5) {
+      setErrorMsg("Lütfen en az 5 karakterlik bir mesaj yazın.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "feedback"), {
+        type: feedbackType,
+        rating: rating || null,
+        message: message.trim(),
+        createdAt: serverTimestamp(),
+        status: "unread",
+      });
+
+      setIsSuccess(true);
+      setMessage("");
+      setRating(0);
+    } catch (err: any) {
+      console.error("Feedback submit error:", err);
+      setErrorMsg("Gönderilirken bir hata oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReset = () => {
+    setIsSuccess(false);
+    setErrorMsg("");
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={handleReset}
+            className="fixed inset-0 z-[210] bg-black/90 backdrop-blur-xl"
+          />
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="fixed inset-0 z-[211] flex items-center justify-center p-4 sm:p-6 pointer-events-none"
+          >
+            <div className="bg-[#121418] w-full max-w-md rounded-[32px] border border-white/10 shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto no-scrollbar pointer-events-auto flex flex-col p-6 sm:p-8 text-white">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-bamm-yellow/10 border border-bamm-yellow/20 flex items-center justify-center text-bamm-yellow">
+                    <MessageSquare size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight uppercase italic text-white">
+                      Görüş & Şikayet
+                    </h3>
+                    <p className="text-[11px] text-gray-400 font-medium">
+                      %100 Anonim İletim
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleReset}
+                  className="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center text-gray-400 hover:text-white active:scale-95 transition-all"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {isSuccess ? (
+                <div className="py-8 flex flex-col items-center text-center space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center border border-green-500/30">
+                    <CheckCircle2 size={36} />
+                  </div>
+                  <h4 className="text-xl font-bold text-white">Teşekkür Ederiz!</h4>
+                  <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
+                    Görüş veya şikayetiniz %100 anonim olarak işletme yönetimine iletilmiştir.
+                  </p>
+                  <button
+                    onClick={handleReset}
+                    className="w-full bg-bamm-yellow text-black font-black uppercase tracking-wider text-xs py-3.5 rounded-2xl mt-4 hover:bg-yellow-400 transition-all"
+                  >
+                    Kapat
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* Type selector */}
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">
+                      Kategori Seçin
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: "Öneri", label: "💡 Öneri" },
+                        { id: "Şikayet", label: "⚠️ Şikayet" },
+                        { id: "Teşekkür", label: "❤️ Teşekkür" },
+                        { id: "Diğer", label: "💬 Diğer" },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setFeedbackType(item.id as any)}
+                          className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all border ${
+                            feedbackType === item.id
+                              ? "bg-bamm-yellow text-black border-bamm-yellow shadow-md"
+                              : "bg-white/5 text-gray-300 border-white/5 hover:bg-white/10"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Rating Stars (Optional) */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Genel Memnuniyet (İsteğe Bağlı)
+                      </label>
+                      {rating > 0 && (
+                        <span className="text-xs font-bold text-bamm-yellow">{rating} / 5 Yıldız</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star === rating ? 0 : star)}
+                          onMouseEnter={() => setHoverRating(star)}
+                          onMouseLeave={() => setHoverRating(0)}
+                          className="p-1 transition-transform active:scale-90"
+                        >
+                          <Star
+                            size={24}
+                            className={`${
+                              star <= (hoverRating || rating)
+                                ? "text-bamm-yellow fill-bamm-yellow"
+                                : "text-gray-600"
+                            } transition-colors`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Message textarea */}
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                      Mesajınız <span className="text-red-400">*</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Görüş, öneri veya deneyiminizi yazabilirsiniz..."
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-bamm-yellow transition-all resize-none"
+                      required
+                    />
+                  </div>
+
+                  {/* Privacy badge */}
+                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-gray-400">
+                    <Lock size={16} className="text-bamm-yellow shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white font-bold">%100 Anonimdir.</strong> İsim, e-posta veya telefon gibi hiçbir kişisel bilgi kaydedilmez.
+                    </span>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-medium flex items-center gap-2">
+                      <AlertCircle size={14} className="shrink-0" />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !message.trim()}
+                    className="w-full bg-bamm-yellow text-black font-black uppercase tracking-wider text-xs py-4 rounded-2xl hover:bg-yellow-400 active:scale-98 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-xl shadow-bamm-yellow/10 cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Send size={16} />
+                        <span>Anonim Olarak Gönder</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </div>
+          </motion.div>
+        </>
       )}
     </AnimatePresence>
   );
@@ -853,11 +1095,13 @@ export function MenuSection({
   onSearchClick,
   onBackClick,
   initialCategory,
+  onFeedbackClick,
 }: {
   onProductClick: (item: MenuItem) => void;
   onSearchClick: () => void;
   onBackClick?: () => void;
   initialCategory?: string;
+  onFeedbackClick?: () => void;
 }) {
   const [selectedCategory, setSelectedCategory] = useState(
     initialCategory || CATEGORIES[0],
@@ -1057,12 +1301,24 @@ export function MenuSection({
             </span>
           </div>
 
-          <button
-            onClick={onSearchClick}
-            className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full border border-gray-100 shadow-sm"
-          >
-            <Search size={20} strokeWidth={2} />
-          </button>
+          <div className="flex items-center gap-2">
+            {onFeedbackClick && (
+              <button
+                onClick={onFeedbackClick}
+                title="Öneri & Şikayet"
+                className="px-3 py-1.5 bg-bamm-yellow text-black rounded-full flex items-center gap-1.5 shadow-sm active:scale-95 transition-all font-black text-xs cursor-pointer"
+              >
+                <MessageSquare size={14} strokeWidth={2.5} />
+                <span className="text-[10px] uppercase font-black tracking-wider hidden sm:inline">Görüş Bildir</span>
+              </button>
+            )}
+            <button
+              onClick={onSearchClick}
+              className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full border border-gray-100 shadow-sm"
+            >
+              <Search size={20} strokeWidth={2} />
+            </button>
+          </div>
         </div>
 
         {/* Campaign / Happy Hour Banner */}
@@ -1700,9 +1956,11 @@ export function InfoModal({
 export function ContactSection({
   onSearchClick,
   onAdminClick,
+  onFeedbackClick,
 }: {
   onSearchClick: () => void;
   onAdminClick?: () => void;
+  onFeedbackClick?: () => void;
 }) {
   const info = {
     name: "BAMM GARDEN & NIGHT",
@@ -1782,6 +2040,34 @@ export function ContactSection({
               <MapPin size={20} strokeWidth={1.5} />
             </a>
           </div>
+
+          {/* Anonymous Feedback Card Button */}
+          {onFeedbackClick && (
+            <div className="w-full mb-6">
+              <button
+                onClick={onFeedbackClick}
+                className="w-full bg-gradient-to-r from-bamm-yellow/20 via-bamm-yellow/10 to-transparent border border-bamm-yellow/30 hover:border-bamm-yellow/60 rounded-[24px] p-4 flex items-center gap-3.5 text-left transition-all active:scale-98 group cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-2xl bg-bamm-yellow text-black flex items-center justify-center shrink-0 shadow-lg shadow-bamm-yellow/20 group-hover:scale-105 transition-transform">
+                  <MessageSquare size={18} strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black uppercase italic tracking-wider text-bamm-yellow">
+                      Anonim Öneri & Şikayet
+                    </span>
+                    <span className="text-[9px] bg-white/10 text-white/70 px-1.5 py-0.5 rounded-full font-bold">
+                      %100 Gizli
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 font-medium truncate mt-0.5">
+                    Görüşlerinizi doğrudan yönetime iletin
+                  </p>
+                </div>
+                <ChevronRight size={18} className="text-bamm-yellow group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+          )}
 
           {/* Simple Details */}
           <div className="w-full space-y-4 sm:space-y-6 mb-6 sm:mb-10 px-2 shrink-0">

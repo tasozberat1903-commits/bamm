@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { MessageSquare } from "lucide-react";
 import BottomNav from "./components/BottomNav";
 import {
   Header,
@@ -10,6 +11,7 @@ import {
   ProductDetail,
   SearchModal,
   InfoModal,
+  FeedbackModal,
 } from "./components/Sections";
 import { AdminPanel } from "./components/AdminPanel";
 import { MenuItem } from "./data";
@@ -23,6 +25,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
   const scrollToTop = () => {
@@ -73,6 +76,7 @@ export default function App() {
             onSearchClick={() => setIsSearchOpen(true)}
             onBackClick={() => setActiveTab("home")}
             initialCategory={menuInitialCategory}
+            onFeedbackClick={() => setIsFeedbackOpen(true)}
           />
         );
       case "events":
@@ -81,6 +85,7 @@ export default function App() {
         return (
           <ContactSection
             onSearchClick={() => setIsSearchOpen(true)}
+            onFeedbackClick={() => setIsFeedbackOpen(true)}
           />
         );
       case "admin":
@@ -143,6 +148,7 @@ export default function App() {
                 <Header
                   isLight={["contact", "menu"].includes(activeTab)}
                   onSearchClick={() => setIsSearchOpen(true)}
+                  onFeedbackClick={() => setIsFeedbackOpen(true)}
                   onLogoClick={scrollToTop}
                 />
               )}
@@ -190,6 +196,24 @@ export default function App() {
               onInfoClick={() => setIsInfoOpen(true)}
             />
 
+            {/* Floating Anonymous Feedback Button */}
+            {activeTab !== "admin" && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                onClick={() => setIsFeedbackOpen(true)}
+                className="fixed bottom-[88px] right-4 z-[90] bg-bamm-yellow text-black px-3.5 py-2.5 rounded-full font-black text-xs uppercase tracking-wider shadow-[0_8px_25px_rgba(255,215,0,0.4)] border border-yellow-300 flex items-center gap-2 active:scale-95 hover:scale-105 transition-all cursor-pointer group"
+                title="Görüş & Şikayet Bildir"
+              >
+                <div className="relative flex items-center justify-center">
+                  <MessageSquare size={16} strokeWidth={2.5} className="group-hover:rotate-12 transition-transform" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+                </div>
+                <span className="text-[11px] font-black italic tracking-tight">Görüş Bildir</span>
+              </motion.button>
+            )}
+
             <ProductDetail
               product={selectedProduct}
               onClose={() => setSelectedProduct(null)}
@@ -204,6 +228,11 @@ export default function App() {
             <InfoModal
               isOpen={isInfoOpen}
               onClose={() => setIsInfoOpen(false)}
+            />
+
+            <FeedbackModal
+              isOpen={isFeedbackOpen}
+              onClose={() => setIsFeedbackOpen(false)}
             />
           </>
         )}
