@@ -112,16 +112,6 @@ export function Header({
       </div>
 
       <div className="flex gap-2 relative z-10">
-        {onFeedbackClick && (
-          <button
-            onClick={onFeedbackClick}
-            title="Öneri & Şikayet"
-            className="relative px-3 py-1.5 bg-bamm-yellow text-black rounded-full flex items-center gap-1.5 shadow-md shadow-bamm-yellow/20 active:scale-95 transition-all font-black text-xs cursor-pointer"
-          >
-            <MessageSquare size={14} strokeWidth={2.5} />
-            <span className="text-[10px] uppercase font-black tracking-wider">Görüş Bildir</span>
-          </button>
-        )}
         <button
           onClick={onSearchClick}
           className={`w-9 h-9 ${isLight ? "bg-black/[0.03]" : "bg-white/5"} rounded-full flex items-center justify-center border ${isLight ? "border-black/5" : "border-white/10"} ${isLight ? "text-gray-600" : "text-gray-400"} active:scale-95 transition-transform`}
@@ -1301,24 +1291,12 @@ export function MenuSection({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {onFeedbackClick && (
-              <button
-                onClick={onFeedbackClick}
-                title="Öneri & Şikayet"
-                className="px-3 py-1.5 bg-bamm-yellow text-black rounded-full flex items-center gap-1.5 shadow-sm active:scale-95 transition-all font-black text-xs cursor-pointer"
-              >
-                <MessageSquare size={14} strokeWidth={2.5} />
-                <span className="text-[10px] uppercase font-black tracking-wider hidden sm:inline">Görüş Bildir</span>
-              </button>
-            )}
-            <button
-              onClick={onSearchClick}
-              className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full border border-gray-100 shadow-sm"
-            >
-              <Search size={20} strokeWidth={2} />
-            </button>
-          </div>
+          <button
+            onClick={onSearchClick}
+            className="w-10 h-10 flex items-center justify-center text-gray-900 hover:scale-110 transition-transform bg-gray-50 rounded-full border border-gray-100 shadow-sm"
+          >
+            <Search size={20} strokeWidth={2} />
+          </button>
         </div>
 
         {/* Campaign / Happy Hour Banner */}
@@ -1383,39 +1361,11 @@ export function MenuSection({
             </div>
           </motion.div>
         </div>
-
-        <div className="px-6 flex items-start gap-4">
-          <div className="w-[52px] h-[52px] bg-[#FFF8D6] rounded-full flex items-center justify-center text-[#0F172A] shrink-0 mt-1 overflow-hidden">
-            {(() => {
-              const dbCat = dbCategories.find(c => c.name === selectedCategory);
-              if (dbCat?.image) {
-                return (
-                  <img
-                    src={dbCat.image}
-                    alt={selectedCategory}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                );
-              }
-              const TitleIcon = CATEGORY_ICONS[selectedCategory] || Utensils;
-              return <TitleIcon size={26} strokeWidth={2.5} />;
-            })()}
-          </div>
-          <div>
-            <h1 className="text-[40px] leading-none font-black text-gray-900 tracking-tight mb-2">
-              {selectedCategory === "Popüler" ? "Favoriler" : selectedCategory}
-            </h1>
-            <p className="text-gray-500 font-medium text-sm">
-              {getCatDescription(selectedCategory)}
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Category Navigation Area */}
       <div className="bg-white rounded-t-[40px] pt-6 flex-1 flex flex-col relative shadow-[0_-10px_20px_rgba(0,0,0,0.02)] border-t border-gray-100">
-        <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0">
+        <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 pb-4 shrink-0">
           {dynamicCategories
             .map((cat) => {
             const isActive = selectedCategory === cat;
@@ -1481,6 +1431,35 @@ export function MenuSection({
               </button>
             );
           })}
+        </div>
+
+        {/* Selected Category Header below categories */}
+        <div className="px-6 py-4 flex items-center gap-4 border-b border-gray-100/80 mb-2">
+          <div className="w-[52px] h-[52px] bg-[#FFF8D6] rounded-full flex items-center justify-center text-[#0F172A] shrink-0 overflow-hidden shadow-sm">
+            {(() => {
+              const dbCat = dbCategories.find(c => c.name === selectedCategory);
+              if (dbCat?.image) {
+                return (
+                  <img
+                    src={dbCat.image}
+                    alt={selectedCategory}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                );
+              }
+              const TitleIcon = CATEGORY_ICONS[selectedCategory] || Utensils;
+              return <TitleIcon size={26} strokeWidth={2.5} />;
+            })()}
+          </div>
+          <div>
+            <h1 className="text-[32px] sm:text-[36px] leading-tight font-black text-gray-900 tracking-tight">
+              {selectedCategory === "Popüler" ? "Favoriler" : selectedCategory}
+            </h1>
+            <p className="text-gray-500 font-medium text-xs sm:text-sm">
+              {getCatDescription(selectedCategory)}
+            </p>
+          </div>
         </div>
 
         {categorySubcategories.length > 0 && (
