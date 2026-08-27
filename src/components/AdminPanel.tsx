@@ -654,6 +654,60 @@ export function AdminPanel() {
     }
   };
 
+  const quickUpdatePrice = async (p: MenuItem, rawPrice: string) => {
+    let clean = rawPrice.trim();
+    if (!clean) return;
+    if (!clean.toUpperCase().includes("TL")) {
+      clean = `${clean} TL`;
+    }
+    if (clean === p.price) return;
+
+    setProducts((prev) =>
+      prev.map((item) => (item.id === p.id ? { ...item, price: clean } : item))
+    );
+
+    try {
+      const ref = doc(db, "products", p.id);
+      await setDoc(ref, { ...p, price: clean }, { merge: true });
+      clearMenuCaches();
+    } catch (e: any) {
+      console.warn("Fiyat güncelleme hatası:", e);
+      handleFirestoreError(e, OperationType.WRITE, `products/${p.id}`, false);
+    }
+  };
+
+  const quickUpdateOrder = async (p: MenuItem, newOrder: number) => {
+    if (isNaN(newOrder) || newOrder === p.order) return;
+
+    setProducts((prev) =>
+      prev.map((item) => (item.id === p.id ? { ...item, order: newOrder } : item))
+    );
+
+    try {
+      const ref = doc(db, "products", p.id);
+      await setDoc(ref, { ...p, order: newOrder }, { merge: true });
+      clearMenuCaches();
+    } catch (e: any) {
+      console.warn("Sıra güncelleme hatası:", e);
+      handleFirestoreError(e, OperationType.WRITE, `products/${p.id}`, false);
+    }
+  };
+
+  const togglePopular = async (p: MenuItem) => {
+    const newStatus = !p.isPopular;
+    setProducts((prev) =>
+      prev.map((item) => (item.id === p.id ? { ...item, isPopular: newStatus } : item))
+    );
+    try {
+      const ref = doc(db, "products", p.id);
+      await setDoc(ref, { ...p, isPopular: newStatus }, { merge: true });
+      clearMenuCaches();
+    } catch (e: any) {
+      console.warn("Popülerlik değiştirme hatası:", e);
+      handleFirestoreError(e, OperationType.WRITE, `products/${p.id}`, false);
+    }
+  };
+
   const startEdit = (p: MenuItem) => {
     setIsEditing(p.id);
     setEditForm(p);
@@ -1024,10 +1078,10 @@ export function AdminPanel() {
                     <tr className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
                       <th className="px-6 py-4">Ürün Detayı</th>
                       <th className="px-6 py-4">Kategori</th>
-                      <th className="px-6 py-4">Fiyat</th>
+                      <th className="px-6 py-4">Fiyat (Doğrudan Değiştir)</th>
                       <th className="px-6 py-4">Sıralama</th>
-                      <th className="px-6 py-4">Stok Durumu (Hızlı Toggle)</th>
-                      <th className="px-6 py-4 text-right">Düzenle</th>
+                      <th className="px-6 py-4">Stok Durumu</th>
+                      <th className="px-6 py-4 text-right">İşlemler</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -1048,10 +1102,23 @@ export function AdminPanel() {
                               )}
                             </div>
                             <div className="flex flex-col">
-                              <span className="text-sm font-bold text-white flex items-center gap-2">
-                                <span className={p.isSoldOut ? "line-through text-gray-400" : ""}>{p.name}</span>
-                                {p.isPopular && <Star size={12} className="text-bamm-yellow fill-bamm-yellow" />}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-bold text-white ${p.isSoldOut ? "line-through text-gray-400" : ""}`}>
+                                  {p.name}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => togglePopular(p)}
+                                  className={`p-1 rounded-md transition-all cursor-pointer ${
+                                    p.isPopular 
+                                      ? "text-bamm-yellow bg-bamm-yellow/10" 
+                                      : "text-gray-600 hover:text-gray-400 hover:bg-white/5"
+                                  }`}
+                                  title={p.isPopular ? "Popülerden Kaldır (Tıkla)" : "Popüler Yap (Tıkla)"}
+                                >
+                                  <Star size={13} className={p.isPopular ? "fill-bamm-yellow" : ""} />
+                                </button>
+                              </div>
                               <span className="text-xs text-gray-500 truncate max-w-[200px]">{p.description || "Açıklama yok"}</span>
                             </div>
                           </div>
@@ -1064,15 +1131,30 @@ export function AdminPanel() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-5 font-black text-bamm-yellow text-sm">
-                          {p.price}
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              defaultValue={p.price}
+                              key={`${p.id}-${p.price}`}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                              onBlur={(e) => quickUpdatePrice(p, e.target.value)}
+                              className="w-28 bg-black/60 border border-white/10 hover:border-bamm-yellow/60 focus:border-bamm-yellow rounded-xl px-3 py-2 text-xs font-black text-bamm-yellow focus:outline-none transition-all"
+                              placeholder="Örn: 150 TL"
+                              title="Fiyatı buradan direkt değiştirip Enter'a basın"
+                            />
+                          </div>
                         </td>
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => moveProduct(p, 'up')}
-                              className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all border border-white/5 cursor-pointer"
+                              className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/15 rounded-lg text-gray-300 hover:text-white transition-all border border-white/10 cursor-pointer"
                               title="Menüde Yukarı Taşı"
                             >
                               <ArrowUp size={13} />
@@ -1080,11 +1162,25 @@ export function AdminPanel() {
                             <button
                               type="button"
                               onClick={() => moveProduct(p, 'down')}
-                              className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all border border-white/5 cursor-pointer"
+                              className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/15 rounded-lg text-gray-300 hover:text-white transition-all border border-white/10 cursor-pointer"
                               title="Menüde Aşağı Taşı"
                             >
                               <ArrowDown size={13} />
                             </button>
+                            <input
+                              type="number"
+                              defaultValue={p.order !== undefined ? p.order : ""}
+                              key={`${p.id}-order-${p.order}`}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                              onBlur={(e) => quickUpdateOrder(p, Number(e.target.value))}
+                              className="w-14 bg-black/50 border border-white/10 hover:border-white/30 focus:border-bamm-yellow rounded-lg px-2 py-1.5 text-center text-xs font-bold text-gray-300 focus:outline-none transition-all"
+                              placeholder="Sıra"
+                              title="Doğrudan Sıra No girin"
+                            />
                           </div>
                         </td>
                         <td className="px-6 py-5">
@@ -1106,15 +1202,30 @@ export function AdminPanel() {
                             ) : (
                               <>
                                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                                🟢 STOKTA VAR
+                                🟢 STOKTA
                               </>
                             )}
                           </button>
                         </td>
                         <td className="px-6 py-5 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => startEdit(p)} className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-white transition-all"><Edit2 size={14} /></button>
-                            <button onClick={() => setIsDeleting(p.id)} className="w-9 h-9 flex items-center justify-center bg-red-400/10 hover:bg-red-400/20 rounded-xl text-red-400 transition-all"><Trash2 size={14} /></button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button 
+                              type="button"
+                              onClick={() => startEdit(p)} 
+                              className="flex items-center gap-1.5 px-3 py-2 bg-bamm-yellow/10 hover:bg-bamm-yellow text-bamm-yellow hover:text-black rounded-xl font-bold text-xs transition-all border border-bamm-yellow/20 cursor-pointer shadow-sm"
+                              title="Tüm Detayları Düzenle (Pencere Aç)"
+                            >
+                              <Edit2 size={13} />
+                              <span>Düzenle</span>
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => setIsDeleting(p.id)} 
+                              className="w-8 h-8 flex items-center justify-center bg-red-400/10 hover:bg-red-400/20 rounded-xl text-red-400 transition-all border border-red-400/20 cursor-pointer"
+                              title="Ürünü Sil"
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1127,7 +1238,7 @@ export function AdminPanel() {
               <div className="md:hidden divide-y divide-white/5">
                  {filteredProducts.map((p) => (
                    <div key={p.id} className={`p-4 flex flex-col gap-3 active:bg-white/5 transition-colors ${p.isSoldOut ? "bg-red-950/10" : ""}`}>
-                     <div className="flex items-center gap-4">
+                     <div className="flex items-center gap-3">
                         <div className="w-14 h-14 bg-black rounded-xl overflow-hidden shrink-0 border border-white/10 relative">
                           {p.image ? (
                             <img src={p.image} className="w-full h-full object-cover" alt="" />
@@ -1141,36 +1252,68 @@ export function AdminPanel() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
+                          <div className="flex items-center gap-1.5 mb-1">
                             <h4 className={`text-xs font-bold uppercase tracking-tight truncate ${p.isSoldOut ? "text-gray-400 line-through" : "text-white"}`}>{p.name}</h4>
-                            {p.isPopular && <Star size={10} className="text-bamm-yellow fill-bamm-yellow" />}
+                            <button
+                              type="button"
+                              onClick={() => togglePopular(p)}
+                              className={`p-1 rounded transition-colors ${p.isPopular ? "text-bamm-yellow" : "text-gray-600"}`}
+                              title="Popülerlik Değiştir"
+                            >
+                              <Star size={12} className={p.isPopular ? "fill-bamm-yellow text-bamm-yellow" : ""} />
+                            </button>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-bamm-yellow">{p.price}</span>
+                            <input
+                              type="text"
+                              defaultValue={p.price}
+                              key={`${p.id}-mob-${p.price}`}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                              onBlur={(e) => quickUpdatePrice(p, e.target.value)}
+                              className="w-24 bg-black/60 border border-white/10 rounded-lg px-2 py-1 text-[11px] font-black text-bamm-yellow focus:outline-none focus:border-bamm-yellow"
+                              placeholder="Fiyat"
+                            />
                             <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest leading-none border-l border-white/10 pl-2">
                               {p.subcategory ? `${p.category} / ${p.subcategory}` : p.category}
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1 shrink-0">
                           <button 
                             type="button"
                             onClick={() => moveProduct(p, 'up')} 
-                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-gray-400 active:text-white border border-white/5"
+                            className="w-7 h-7 flex items-center justify-center bg-white/5 rounded-lg text-gray-400 active:text-white border border-white/5"
                             title="Yukarı Taşı"
                           >
-                            <ArrowUp size={13} />
+                            <ArrowUp size={12} />
                           </button>
                           <button 
                             type="button"
                             onClick={() => moveProduct(p, 'down')} 
-                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-gray-400 active:text-white border border-white/5"
+                            className="w-7 h-7 flex items-center justify-center bg-white/5 rounded-lg text-gray-400 active:text-white border border-white/5"
                             title="Aşağı Taşı"
                           >
-                            <ArrowDown size={13} />
+                            <ArrowDown size={12} />
                           </button>
-                          <button onClick={() => startEdit(p)} className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-white"><Edit2 size={13} /></button>
-                          <button onClick={() => setIsDeleting(p.id)} className="w-8 h-8 flex items-center justify-center bg-red-400/10 rounded-lg text-red-400"><Trash2 size={13} /></button>
+                          <button 
+                            type="button"
+                            onClick={() => startEdit(p)} 
+                            className="px-2.5 py-1.5 bg-bamm-yellow/15 text-bamm-yellow rounded-lg text-[11px] font-bold flex items-center gap-1 border border-bamm-yellow/30"
+                          >
+                            <Edit2 size={11} />
+                            <span>Düzenle</span>
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setIsDeleting(p.id)} 
+                            className="w-7 h-7 flex items-center justify-center bg-red-400/10 rounded-lg text-red-400"
+                          >
+                            <Trash2 size={12} />
+                          </button>
                         </div>
                      </div>
 
