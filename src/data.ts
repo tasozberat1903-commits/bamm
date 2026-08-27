@@ -10,6 +10,7 @@ export interface MenuItem {
   isSoldOut?: boolean;
   allergens?: string[];
   deleted?: boolean;
+  order?: number;
 }
 
 export interface Campaign {
@@ -1058,86 +1059,6 @@ export const MENU_DATA: MenuItem[] = [
     subcategory: "İthal Biralar",
   },
 
-  // --- SICAK İÇECEKLER ---
-  {
-    id: "h1",
-    name: "Türk Kahvesi",
-    description: "Geleneksel Türk kahvesi, lokum eşliğinde.",
-    price: "90 TL",
-    category: "Sıcak İçecekler",
-    image: "https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    id: "h2",
-    name: "Caffe Latte",
-    description: "Espresso ve kremsi süt köpüğü.",
-    price: "120 TL",
-    category: "Sıcak İçecekler",
-    image: "https://images.unsplash.com/photo-1570968915860-54d5c301fa9f?auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    id: "h3",
-    name: "Cappuccino",
-    description: "Espresso, yoğun süt ve süt köpüğü.",
-    price: "125 TL",
-    category: "Sıcak İçecekler",
-  },
-  {
-    id: "h4",
-    name: "Americano",
-    description: "Espresso ve sıcak suyun sade buluşması.",
-    price: "115 TL",
-    category: "Sıcak İçecekler",
-    image: "https://images.unsplash.com/photo-1551030173-122aabc4489c?auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    id: "h5",
-    name: "Bardak Çay",
-    description: "Taze demlenmiş Rize çayı.",
-    price: "35 TL",
-    category: "Sıcak İçecekler",
-  },
-  {
-    id: "h6",
-    name: "Bitki Çayları",
-    description: "Adaçayı, Ihlamur, Kış Çayı, Yeşil Çay seçekenekleri ile.",
-    price: "110 TL",
-    category: "Sıcak İçecekler",
-    image: "https://images.unsplash.com/photo-1563822249548-9a72b6353cd1?auto=format&fit=crop&q=80&w=800",
-  },
-
-  // --- SOĞUK İÇECEKLER ---
-  {
-    id: "sd1",
-    name: "Ev Yapımı Limonata",
-    description: "Taze nane ve limonun ferahlatıcı uyumu.",
-    price: "135 TL",
-    category: "Soğuk İçecekler",
-    image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    id: "sd2",
-    name: "Çilekli Limonata",
-    description: "Taze çilek püreli ev yapımı limonata.",
-    price: "150 TL",
-    category: "Soğuk İçecekler",
-    image: "https://images.unsplash.com/photo-1510626176961-4b57d4fbad03?auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    id: "sd3",
-    name: "Churchill",
-    description: "Soda, taze limon suyu ve tuz.",
-    price: "85 TL",
-    category: "Soğuk İçecekler",
-  },
-  {
-    id: "sd4",
-    name: "Iced Latte",
-    description: "Espresso, soğuk süt ve buz.",
-    price: "130 TL",
-    category: "Soğuk İçecekler",
-    image: "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?auto=format&fit=crop&q=80&w=800",
-  },
 
   // --- SOFT İÇECEKLER ---
   {

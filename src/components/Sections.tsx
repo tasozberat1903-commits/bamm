@@ -185,12 +185,23 @@ export function SearchModal({
 
         const merged = [...MENU_DATA];
         dbProducts.forEach((dbP) => {
-          const idx = merged.findIndex((m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase()));
-          if (idx !== -1) merged[idx] = { ...merged[idx], ...dbP };
+          const idx = merged.findIndex(
+            (m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase() && (!dbP.category || m.category === dbP.category))
+          );
+          if (idx !== -1) merged[idx] = { ...merged[idx], ...dbP, id: merged[idx].id || dbP.id };
           else merged.push(dbP);
         });
 
-        const filteredLiveMenu = merged.filter((p) => !p.deleted);
+        const seenIds = new Set<string>();
+        const filteredLiveMenu = merged
+          .filter((p) => !p.deleted)
+          .filter((p) => {
+            const key = p.id || p.name;
+            if (seenIds.has(key)) return false;
+            seenIds.add(key);
+            return true;
+          });
+
         setProducts(filteredLiveMenu);
         localStorage.setItem("bamm_products_cache", JSON.stringify(filteredLiveMenu));
         localStorage.setItem("bamm_products_cache_time", String(Date.now()));
@@ -1140,6 +1151,7 @@ export function MenuSection({
   useEffect(() => {
     if (initialCategory) {
       setSelectedCategory(initialCategory);
+      setSelectedSubcategory("Tümü");
     }
   }, [initialCategory]);
 
@@ -1255,15 +1267,31 @@ export function MenuSection({
         
         const merged = [...MENU_DATA];
         dbProducts.forEach((dbP) => {
-          const idx = merged.findIndex((m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase()));
+          const idx = merged.findIndex(
+            (m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase() && (!dbP.category || m.category === dbP.category))
+          );
           if (idx !== -1) {
-            merged[idx] = { ...merged[idx], ...dbP };
+            merged[idx] = { ...merged[idx], ...dbP, id: merged[idx].id || dbP.id };
           } else {
             merged.push(dbP);
           }
         });
 
-        const filteredLiveMenu = merged.filter(p => !p.deleted);
+        const seenIds = new Set<string>();
+        const filteredLiveMenu = merged
+          .filter((p) => !p.deleted)
+          .filter((p) => {
+            const key = p.id || p.name;
+            if (seenIds.has(key)) return false;
+            seenIds.add(key);
+            return true;
+          })
+          .sort((a, b) => {
+            const ordA = a.order !== undefined ? a.order : 9999;
+            const ordB = b.order !== undefined ? b.order : 9999;
+            return ordA - ordB;
+          });
+
         setLiveMenu(filteredLiveMenu);
         localStorage.setItem("bamm_products_cache", JSON.stringify(filteredLiveMenu));
         localStorage.setItem("bamm_products_cache_time", String(Date.now()));
@@ -1309,6 +1337,8 @@ export function MenuSection({
     });
   }, [liveMenu, selectedCategory]);
 
+  const isSubcatValid = selectedSubcategory === "Tümü" || categorySubcategories.includes(selectedSubcategory);
+
   const filteredItems = liveMenu.filter((item) => {
     const matchesCategory =
       selectedCategory === "Popüler"
@@ -1316,7 +1346,7 @@ export function MenuSection({
         : item.category === selectedCategory;
 
     let matchesSubcategory = true;
-    if (selectedSubcategory !== "Tümü") {
+    if (selectedSubcategory !== "Tümü" && isSubcatValid) {
       matchesSubcategory = item.subcategory === selectedSubcategory;
     }
 
@@ -1443,7 +1473,10 @@ export function MenuSection({
             return (
               <button
                 key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setSelectedSubcategory("Tümü");
+                }}
                 className={`relative flex flex-col items-center justify-start min-w-[100px] w-[100px] pt-4 pb-4 px-2 rounded-[24px] transition-all duration-300 ${
                   isActive
                     ? "bg-[#FFF9E5] border border-bamm-yellow shadow-sm"

@@ -214,12 +214,24 @@ export function AdminPanel() {
           
           const merged = [...MENU_DATA];
           dbProducts.forEach((dbP) => {
-            const idx = merged.findIndex((m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase()));
-            if (idx !== -1) merged[idx] = { ...merged[idx], ...dbP };
+            const idx = merged.findIndex(
+              (m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase() && (!dbP.category || m.category === dbP.category))
+            );
+            if (idx !== -1) merged[idx] = { ...merged[idx], ...dbP, id: merged[idx].id || dbP.id };
             else merged.push(dbP);
           });
 
-          setProducts(merged.filter(p => !p.deleted));
+          const seenIds = new Set<string>();
+          const filteredLiveMenu = merged
+            .filter((p) => !p.deleted)
+            .filter((p) => {
+              const key = p.id || p.name;
+              if (seenIds.has(key)) return false;
+              seenIds.add(key);
+              return true;
+            });
+
+          setProducts(filteredLiveMenu);
         } else {
           setProducts(MENU_DATA);
         }
@@ -608,6 +620,40 @@ export function AdminPanel() {
     }
   };
 
+  const moveProduct = async (product: MenuItem, direction: 'up' | 'down') => {
+    const siblings = products
+      .filter((p) => p.category === product.category)
+      .sort((a, b) => {
+        const ordA = a.order !== undefined ? a.order : 9999;
+        const ordB = b.order !== undefined ? b.order : 9999;
+        return ordA - ordB;
+      });
+
+    const currentIndex = siblings.findIndex((p) => p.id === product.id);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= siblings.length) return;
+
+    const currentItem = siblings[currentIndex];
+    const targetItem = siblings[targetIndex];
+
+    try {
+      let order1 = currentItem.order !== undefined ? currentItem.order : currentIndex * 10;
+      let order2 = targetItem.order !== undefined ? targetItem.order : targetIndex * 10;
+      if (order1 === order2) {
+        order1 = currentIndex * 10;
+        order2 = targetIndex * 10;
+      }
+
+      await setDoc(doc(db, "products", currentItem.id), { ...currentItem, order: order2 }, { merge: true });
+      await setDoc(doc(db, "products", targetItem.id), { ...targetItem, order: order1 }, { merge: true });
+      clearMenuCaches();
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `products/${currentItem.id}`);
+    }
+  };
+
   const startEdit = (p: MenuItem) => {
     setIsEditing(p.id);
     setEditForm(p);
@@ -757,24 +803,33 @@ export function AdminPanel() {
     );
   }
 
-  const filteredProducts = products.filter(p => {
-    let matchesCat = false;
-    if (selectedCategoryFilter === "Tümü") {
-      matchesCat = true;
-    } else if (selectedCategoryFilter === "Tükenenler") {
-      matchesCat = Boolean(p.isSoldOut);
-    } else {
-      matchesCat = p.category === selectedCategoryFilter;
-    }
-    const normSearch = normalizeTurkish(searchQuery);
-    if (!normSearch) return matchesCat;
-    
-    const nameMatch = normalizeTurkish(p.name).includes(normSearch);
-    const catMatch = normalizeTurkish(p.category).includes(normSearch);
-    const descMatch = normalizeTurkish(p.description).includes(normSearch);
-    const subcatMatch = normalizeTurkish(p.subcategory).includes(normSearch);
-    return matchesCat && (nameMatch || catMatch || descMatch || subcatMatch);
-  });
+  const filteredProducts = products
+    .filter(p => {
+      let matchesCat = false;
+      if (selectedCategoryFilter === "Tümü") {
+        matchesCat = true;
+      } else if (selectedCategoryFilter === "Tükenenler") {
+        matchesCat = Boolean(p.isSoldOut);
+      } else {
+        matchesCat = p.category === selectedCategoryFilter;
+      }
+      const normSearch = normalizeTurkish(searchQuery);
+      if (!normSearch) return matchesCat;
+      
+      const nameMatch = normalizeTurkish(p.name).includes(normSearch);
+      const catMatch = normalizeTurkish(p.category).includes(normSearch);
+      const descMatch = normalizeTurkish(p.description).includes(normSearch);
+      const subcatMatch = normalizeTurkish(p.subcategory).includes(normSearch);
+      return matchesCat && (nameMatch || catMatch || descMatch || subcatMatch);
+    })
+    .sort((a, b) => {
+      if (a.category === b.category) {
+        const ordA = a.order !== undefined ? a.order : 9999;
+        const ordB = b.order !== undefined ? b.order : 9999;
+        return ordA - ordB;
+      }
+      return 0;
+    });
 
   return (
     <div className="flex-1 bg-[#0F1115] text-white flex flex-col md:flex-row h-full overflow-hidden relative">
@@ -970,6 +1025,7 @@ export function AdminPanel() {
                       <th className="px-6 py-4">Ürün Detayı</th>
                       <th className="px-6 py-4">Kategori</th>
                       <th className="px-6 py-4">Fiyat</th>
+                      <th className="px-6 py-4">Sıralama</th>
                       <th className="px-6 py-4">Stok Durumu (Hızlı Toggle)</th>
                       <th className="px-6 py-4 text-right">Düzenle</th>
                     </tr>
@@ -1010,6 +1066,26 @@ export function AdminPanel() {
                         </td>
                         <td className="px-6 py-5 font-black text-bamm-yellow text-sm">
                           {p.price}
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => moveProduct(p, 'up')}
+                              className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all border border-white/5 cursor-pointer"
+                              title="Menüde Yukarı Taşı"
+                            >
+                              <ArrowUp size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveProduct(p, 'down')}
+                              className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all border border-white/5 cursor-pointer"
+                              title="Menüde Aşağı Taşı"
+                            >
+                              <ArrowDown size={13} />
+                            </button>
+                          </div>
                         </td>
                         <td className="px-6 py-5">
                           <button
@@ -1077,8 +1153,24 @@ export function AdminPanel() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <button onClick={() => startEdit(p)} className="w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl text-white"><Edit2 size={14} /></button>
-                          <button onClick={() => setIsDeleting(p.id)} className="w-9 h-9 flex items-center justify-center bg-red-400/10 rounded-xl text-red-400"><Trash2 size={14} /></button>
+                          <button 
+                            type="button"
+                            onClick={() => moveProduct(p, 'up')} 
+                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-gray-400 active:text-white border border-white/5"
+                            title="Yukarı Taşı"
+                          >
+                            <ArrowUp size={13} />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => moveProduct(p, 'down')} 
+                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-gray-400 active:text-white border border-white/5"
+                            title="Aşağı Taşı"
+                          >
+                            <ArrowDown size={13} />
+                          </button>
+                          <button onClick={() => startEdit(p)} className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-white"><Edit2 size={13} /></button>
+                          <button onClick={() => setIsDeleting(p.id)} className="w-8 h-8 flex items-center justify-center bg-red-400/10 rounded-lg text-red-400"><Trash2 size={13} /></button>
                         </div>
                      </div>
 
@@ -1630,7 +1722,7 @@ export function AdminPanel() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                   <div>
                     <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Fiyat</label>
                     <input
@@ -1656,6 +1748,16 @@ export function AdminPanel() {
                       </select>
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 pointer-events-none" />
                     </div>
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Sıra No (Opsiyonel)</label>
+                    <input
+                      type="number"
+                      placeholder="Örn: 10"
+                      value={editForm.order !== undefined ? editForm.order : ""}
+                      onChange={(e) => setEditForm({ ...editForm, order: e.target.value !== "" ? Number(e.target.value) : undefined })}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl px-5 py-4 md:px-6 md:py-5 text-sm text-white focus:ring-1 focus:ring-bamm-yellow"
+                    />
                   </div>
                 </div>
 
