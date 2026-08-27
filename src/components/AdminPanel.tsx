@@ -666,7 +666,20 @@ export function AdminPanel() {
     try {
       const writes = swapped.map((item, idx) => {
         const newOrd = (idx + 1) * 10;
-        return setDoc(doc(db, "products", item.id), { ...item, order: newOrd }, { merge: true });
+        const itemData: any = {
+          name: item.name,
+          price: item.price,
+          category: item.category,
+          order: newOrd,
+          deleted: false
+        };
+        if (item.description) itemData.description = item.description;
+        if (item.subcategory) itemData.subcategory = item.subcategory;
+        if (item.image) itemData.image = item.image;
+        if (item.isPopular !== undefined) itemData.isPopular = item.isPopular;
+        if (item.isSoldOut !== undefined) itemData.isSoldOut = item.isSoldOut;
+
+        return setDoc(doc(db, "products", item.id), itemData, { merge: true });
       });
       await Promise.all(writes);
       clearMenuCaches();
@@ -684,8 +697,21 @@ export function AdminPanel() {
     );
 
     try {
+      const itemData: any = {
+        name: p.name,
+        price: p.price,
+        category: p.category,
+        order: newOrder,
+        deleted: false
+      };
+      if (p.description) itemData.description = p.description;
+      if (p.subcategory) itemData.subcategory = p.subcategory;
+      if (p.image) itemData.image = p.image;
+      if (p.isPopular !== undefined) itemData.isPopular = p.isPopular;
+      if (p.isSoldOut !== undefined) itemData.isSoldOut = p.isSoldOut;
+
       const ref = doc(db, "products", p.id);
-      await setDoc(ref, { ...p, order: newOrder }, { merge: true });
+      await setDoc(ref, itemData, { merge: true });
       clearMenuCaches();
     } catch (e: any) {
       console.warn("Sıra güncelleme hatası:", e);
