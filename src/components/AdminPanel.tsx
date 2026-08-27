@@ -620,14 +620,23 @@ export function AdminPanel() {
     }
   };
 
+  const defaultIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    MENU_DATA.forEach((m, idx) => map.set(m.id, idx));
+    return map;
+  }, []);
+
+  const getProductRank = (item: MenuItem): number => {
+    if (typeof item.order === 'number' && !isNaN(item.order)) {
+      return item.order;
+    }
+    return defaultIndexMap.get(item.id) ?? 9999;
+  };
+
   const moveProduct = async (product: MenuItem, direction: 'up' | 'down') => {
     const siblings = products
       .filter((p) => p.category === product.category)
-      .sort((a, b) => {
-        const ordA = a.order !== undefined ? a.order : 9999;
-        const ordB = b.order !== undefined ? b.order : 9999;
-        return ordA - ordB;
-      });
+      .sort((a, b) => getProductRank(a) - getProductRank(b));
 
     const currentIndex = siblings.findIndex((p) => p.id === product.id);
     if (currentIndex === -1) return;
@@ -635,44 +644,35 @@ export function AdminPanel() {
     const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
     if (targetIndex < 0 || targetIndex >= siblings.length) return;
 
-    const currentItem = siblings[currentIndex];
-    const targetItem = siblings[targetIndex];
+    const swapped = [...siblings];
+    const temp = swapped[currentIndex];
+    swapped[currentIndex] = swapped[targetIndex];
+    swapped[targetIndex] = temp;
 
-    try {
-      let order1 = currentItem.order !== undefined ? currentItem.order : currentIndex * 10;
-      let order2 = targetItem.order !== undefined ? targetItem.order : targetIndex * 10;
-      if (order1 === order2) {
-        order1 = currentIndex * 10;
-        order2 = targetIndex * 10;
-      }
-
-      await setDoc(doc(db, "products", currentItem.id), { ...currentItem, order: order2 }, { merge: true });
-      await setDoc(doc(db, "products", targetItem.id), { ...targetItem, order: order1 }, { merge: true });
-      clearMenuCaches();
-    } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, `products/${currentItem.id}`);
-    }
-  };
-
-  const quickUpdatePrice = async (p: MenuItem, rawPrice: string) => {
-    let clean = rawPrice.trim();
-    if (!clean) return;
-    if (!clean.toUpperCase().includes("TL")) {
-      clean = `${clean} TL`;
-    }
-    if (clean === p.price) return;
+    const updatedOrders = new Map<string, number>();
+    swapped.forEach((item, idx) => {
+      updatedOrders.set(item.id, (idx + 1) * 10);
+    });
 
     setProducts((prev) =>
-      prev.map((item) => (item.id === p.id ? { ...item, price: clean } : item))
+      prev.map((item) => {
+        if (updatedOrders.has(item.id)) {
+          return { ...item, order: updatedOrders.get(item.id) };
+        }
+        return item;
+      })
     );
 
     try {
-      const ref = doc(db, "products", p.id);
-      await setDoc(ref, { ...p, price: clean }, { merge: true });
+      const writes = swapped.map((item, idx) => {
+        const newOrd = (idx + 1) * 10;
+        return setDoc(doc(db, "products", item.id), { ...item, order: newOrd }, { merge: true });
+      });
+      await Promise.all(writes);
       clearMenuCaches();
     } catch (e: any) {
-      console.warn("Fiyat güncelleme hatası:", e);
-      handleFirestoreError(e, OperationType.WRITE, `products/${p.id}`, false);
+      console.warn("Sıralama kaydetme hatası:", e);
+      handleFirestoreError(e, OperationType.WRITE, `products/${product.id}`, false);
     }
   };
 
@@ -689,21 +689,6 @@ export function AdminPanel() {
       clearMenuCaches();
     } catch (e: any) {
       console.warn("Sıra güncelleme hatası:", e);
-      handleFirestoreError(e, OperationType.WRITE, `products/${p.id}`, false);
-    }
-  };
-
-  const togglePopular = async (p: MenuItem) => {
-    const newStatus = !p.isPopular;
-    setProducts((prev) =>
-      prev.map((item) => (item.id === p.id ? { ...item, isPopular: newStatus } : item))
-    );
-    try {
-      const ref = doc(db, "products", p.id);
-      await setDoc(ref, { ...p, isPopular: newStatus }, { merge: true });
-      clearMenuCaches();
-    } catch (e: any) {
-      console.warn("Popülerlik değiştirme hatası:", e);
       handleFirestoreError(e, OperationType.WRITE, `products/${p.id}`, false);
     }
   };
@@ -878,11 +863,11 @@ export function AdminPanel() {
     })
     .sort((a, b) => {
       if (a.category === b.category) {
-        const ordA = a.order !== undefined ? a.order : 9999;
-        const ordB = b.order !== undefined ? b.order : 9999;
-        return ordA - ordB;
+        return getProductRank(a) - getProductRank(b);
       }
-      return 0;
+      const idxA = defaultIndexMap.get(a.id) ?? 9999;
+      const idxB = defaultIndexMap.get(b.id) ?? 9999;
+      return idxA - idxB;
     });
 
   return (
@@ -1078,7 +1063,7 @@ export function AdminPanel() {
                     <tr className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
                       <th className="px-6 py-4">Ürün Detayı</th>
                       <th className="px-6 py-4">Kategori</th>
-                      <th className="px-6 py-4">Fiyat (Doğrudan Değiştir)</th>
+                      <th className="px-6 py-4">Fiyat</th>
                       <th className="px-6 py-4">Sıralama</th>
                       <th className="px-6 py-4">Stok Durumu</th>
                       <th className="px-6 py-4 text-right">İşlemler</th>
@@ -1102,23 +1087,10 @@ export function AdminPanel() {
                               )}
                             </div>
                             <div className="flex flex-col">
-                              <div className="flex items-center gap-2">
-                                <span className={`text-sm font-bold text-white ${p.isSoldOut ? "line-through text-gray-400" : ""}`}>
-                                  {p.name}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => togglePopular(p)}
-                                  className={`p-1 rounded-md transition-all cursor-pointer ${
-                                    p.isPopular 
-                                      ? "text-bamm-yellow bg-bamm-yellow/10" 
-                                      : "text-gray-600 hover:text-gray-400 hover:bg-white/5"
-                                  }`}
-                                  title={p.isPopular ? "Popülerden Kaldır (Tıkla)" : "Popüler Yap (Tıkla)"}
-                                >
-                                  <Star size={13} className={p.isPopular ? "fill-bamm-yellow" : ""} />
-                                </button>
-                              </div>
+                              <span className="text-sm font-bold text-white flex items-center gap-2">
+                                <span className={p.isSoldOut ? "line-through text-gray-400" : ""}>{p.name}</span>
+                                {p.isPopular && <Star size={12} className="text-bamm-yellow fill-bamm-yellow" />}
+                              </span>
                               <span className="text-xs text-gray-500 truncate max-w-[200px]">{p.description || "Açıklama yok"}</span>
                             </div>
                           </div>
@@ -1131,23 +1103,8 @@ export function AdminPanel() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="text"
-                              defaultValue={p.price}
-                              key={`${p.id}-${p.price}`}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  (e.target as HTMLInputElement).blur();
-                                }
-                              }}
-                              onBlur={(e) => quickUpdatePrice(p, e.target.value)}
-                              className="w-28 bg-black/60 border border-white/10 hover:border-bamm-yellow/60 focus:border-bamm-yellow rounded-xl px-3 py-2 text-xs font-black text-bamm-yellow focus:outline-none transition-all"
-                              placeholder="Örn: 150 TL"
-                              title="Fiyatı buradan direkt değiştirip Enter'a basın"
-                            />
-                          </div>
+                        <td className="px-6 py-5 font-black text-bamm-yellow text-sm">
+                          {p.price}
                         </td>
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-1.5">
@@ -1212,19 +1169,18 @@ export function AdminPanel() {
                             <button 
                               type="button"
                               onClick={() => startEdit(p)} 
-                              className="flex items-center gap-1.5 px-3 py-2 bg-bamm-yellow/10 hover:bg-bamm-yellow text-bamm-yellow hover:text-black rounded-xl font-bold text-xs transition-all border border-bamm-yellow/20 cursor-pointer shadow-sm"
-                              title="Tüm Detayları Düzenle (Pencere Aç)"
+                              className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-white transition-all cursor-pointer border border-white/5"
+                              title="Düzenle"
                             >
-                              <Edit2 size={13} />
-                              <span>Düzenle</span>
+                              <Edit2 size={14} />
                             </button>
                             <button 
                               type="button"
                               onClick={() => setIsDeleting(p.id)} 
-                              className="w-8 h-8 flex items-center justify-center bg-red-400/10 hover:bg-red-400/20 rounded-xl text-red-400 transition-all border border-red-400/20 cursor-pointer"
+                              className="w-9 h-9 flex items-center justify-center bg-red-400/10 hover:bg-red-400/20 rounded-xl text-red-400 transition-all cursor-pointer border border-red-400/10"
                               title="Ürünü Sil"
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </td>
@@ -1254,29 +1210,10 @@ export function AdminPanel() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-1">
                             <h4 className={`text-xs font-bold uppercase tracking-tight truncate ${p.isSoldOut ? "text-gray-400 line-through" : "text-white"}`}>{p.name}</h4>
-                            <button
-                              type="button"
-                              onClick={() => togglePopular(p)}
-                              className={`p-1 rounded transition-colors ${p.isPopular ? "text-bamm-yellow" : "text-gray-600"}`}
-                              title="Popülerlik Değiştir"
-                            >
-                              <Star size={12} className={p.isPopular ? "fill-bamm-yellow text-bamm-yellow" : ""} />
-                            </button>
+                            {p.isPopular && <Star size={10} className="text-bamm-yellow fill-bamm-yellow" />}
                           </div>
                           <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              defaultValue={p.price}
-                              key={`${p.id}-mob-${p.price}`}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  (e.target as HTMLInputElement).blur();
-                                }
-                              }}
-                              onBlur={(e) => quickUpdatePrice(p, e.target.value)}
-                              className="w-24 bg-black/60 border border-white/10 rounded-lg px-2 py-1 text-[11px] font-black text-bamm-yellow focus:outline-none focus:border-bamm-yellow"
-                              placeholder="Fiyat"
-                            />
+                            <span className="text-[11px] font-black text-bamm-yellow">{p.price}</span>
                             <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest leading-none border-l border-white/10 pl-2">
                               {p.subcategory ? `${p.category} / ${p.subcategory}` : p.category}
                             </span>
@@ -1286,33 +1223,34 @@ export function AdminPanel() {
                           <button 
                             type="button"
                             onClick={() => moveProduct(p, 'up')} 
-                            className="w-7 h-7 flex items-center justify-center bg-white/5 rounded-lg text-gray-400 active:text-white border border-white/5"
+                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-gray-300 active:text-white border border-white/10"
                             title="Yukarı Taşı"
                           >
-                            <ArrowUp size={12} />
+                            <ArrowUp size={13} />
                           </button>
                           <button 
                             type="button"
                             onClick={() => moveProduct(p, 'down')} 
-                            className="w-7 h-7 flex items-center justify-center bg-white/5 rounded-lg text-gray-400 active:text-white border border-white/5"
+                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-gray-300 active:text-white border border-white/10"
                             title="Aşağı Taşı"
                           >
-                            <ArrowDown size={12} />
+                            <ArrowDown size={13} />
                           </button>
                           <button 
                             type="button"
                             onClick={() => startEdit(p)} 
-                            className="px-2.5 py-1.5 bg-bamm-yellow/15 text-bamm-yellow rounded-lg text-[11px] font-bold flex items-center gap-1 border border-bamm-yellow/30"
+                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-white border border-white/5"
+                            title="Düzenle"
                           >
-                            <Edit2 size={11} />
-                            <span>Düzenle</span>
+                            <Edit2 size={13} />
                           </button>
                           <button 
                             type="button"
                             onClick={() => setIsDeleting(p.id)} 
-                            className="w-7 h-7 flex items-center justify-center bg-red-400/10 rounded-lg text-red-400"
+                            className="w-8 h-8 flex items-center justify-center bg-red-400/10 rounded-lg text-red-400 border border-red-400/10"
+                            title="Sil"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                      </div>

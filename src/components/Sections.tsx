@@ -1278,6 +1278,16 @@ export function MenuSection({
         });
 
         const seenIds = new Set<string>();
+        const defaultIndexMap = new Map<string, number>();
+        MENU_DATA.forEach((m, idx) => defaultIndexMap.set(m.id, idx));
+
+        const getRank = (item: MenuItem) => {
+          if (typeof item.order === 'number' && !isNaN(item.order)) {
+            return item.order;
+          }
+          return defaultIndexMap.get(item.id) ?? 9999;
+        };
+
         const filteredLiveMenu = merged
           .filter((p) => !p.deleted)
           .filter((p) => {
@@ -1287,9 +1297,12 @@ export function MenuSection({
             return true;
           })
           .sort((a, b) => {
-            const ordA = a.order !== undefined ? a.order : 9999;
-            const ordB = b.order !== undefined ? b.order : 9999;
-            return ordA - ordB;
+            if (a.category === b.category) {
+              return getRank(a) - getRank(b);
+            }
+            const idxA = defaultIndexMap.get(a.id) ?? 9999;
+            const idxB = defaultIndexMap.get(b.id) ?? 9999;
+            return idxA - idxB;
           });
 
         setLiveMenu(filteredLiveMenu);
