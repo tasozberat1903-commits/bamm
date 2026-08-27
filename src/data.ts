@@ -7,6 +7,7 @@ export interface MenuItem {
   subcategory?: string;
   image?: string;
   isPopular?: boolean;
+  isSoldOut?: boolean;
   allergens?: string[];
   deleted?: boolean;
 }
@@ -41,6 +42,27 @@ export interface HeroSlide {
 export const CATEGORIES = [
   "Kampanyalar", "Yemekler", "Kadeh", "Şişeler", "Şarap", "Kokteyller", "Alkolsüz Kokteyller", "Biralar", "Shotlar", "Popüler", "Kahvaltı", "Kahveler", "Soğuk Kahveler", "Çaylar", "Atıştırmalıklar", "Salatalar", "Tatlılar", "Soğuk İçecekler", "Soft İçecekler"
 ];
+
+export function normalizeTurkish(text?: string): string {
+  if (!text) return "";
+  return text
+    .toString()
+    .replace(/İ/g, "i")
+    .replace(/I/g, "ı")
+    .replace(/ı/g, "i")
+    .replace(/ğ/g, "g")
+    .replace(/Ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/Ü/g, "u")
+    .replace(/ş/g, "s")
+    .replace(/Ş/g, "s")
+    .replace(/ö/g, "o")
+    .replace(/Ö/g, "o")
+    .replace(/ç/g, "c")
+    .replace(/Ç/g, "c")
+    .toLowerCase()
+    .trim();
+}
 
 export const MENU_DATA: MenuItem[] = [
   // --- POPÜLER SEÇİMLER (isPopular: true olanlar otomatik olarak Popüler Lezzetler kısmına gelir) ---

@@ -17,7 +17,7 @@ import {
   doc,
   deleteDoc,
 } from "firebase/firestore";
-import { CATEGORIES, MENU_DATA, MenuItem } from "../data";
+import { CATEGORIES, MENU_DATA, MenuItem, normalizeTurkish } from "../data";
 import { 
   LogOut, 
   Plus, 
@@ -214,8 +214,8 @@ export function AdminPanel() {
           
           const merged = [...MENU_DATA];
           dbProducts.forEach((dbP) => {
-            const idx = merged.findIndex((m) => m.id === dbP.id);
-            if (idx !== -1) merged[idx] = dbP;
+            const idx = merged.findIndex((m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase()));
+            if (idx !== -1) merged[idx] = { ...merged[idx], ...dbP };
             else merged.push(dbP);
           });
 
@@ -470,6 +470,21 @@ export function AdminPanel() {
       clearMenuCaches();
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `products/${id}`);
+    }
+  };
+
+  const toggleSoldOut = async (p: MenuItem) => {
+    const newStatus = !p.isSoldOut;
+    setProducts((prev) =>
+      prev.map((item) => (item.id === p.id ? { ...item, isSoldOut: newStatus } : item))
+    );
+    try {
+      const ref = doc(db, "products", p.id);
+      await setDoc(ref, { ...p, isSoldOut: newStatus }, { merge: true });
+      clearMenuCaches();
+    } catch (e: any) {
+      console.warn("Toggle sold out error:", e);
+      handleFirestoreError(e, OperationType.WRITE, `products/${p.id}`, false);
     }
   };
 
@@ -743,10 +758,22 @@ export function AdminPanel() {
   }
 
   const filteredProducts = products.filter(p => {
-    const matchesCat = selectedCategoryFilter === "Tümü" || p.category === selectedCategoryFilter;
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         p.category?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCat && matchesSearch;
+    let matchesCat = false;
+    if (selectedCategoryFilter === "Tümü") {
+      matchesCat = true;
+    } else if (selectedCategoryFilter === "Tükenenler") {
+      matchesCat = Boolean(p.isSoldOut);
+    } else {
+      matchesCat = p.category === selectedCategoryFilter;
+    }
+    const normSearch = normalizeTurkish(searchQuery);
+    if (!normSearch) return matchesCat;
+    
+    const nameMatch = normalizeTurkish(p.name).includes(normSearch);
+    const catMatch = normalizeTurkish(p.category).includes(normSearch);
+    const descMatch = normalizeTurkish(p.description).includes(normSearch);
+    const subcatMatch = normalizeTurkish(p.subcategory).includes(normSearch);
+    return matchesCat && (nameMatch || catMatch || descMatch || subcatMatch);
   });
 
   return (
@@ -884,7 +911,7 @@ export function AdminPanel() {
             </div>
 
             {/* Quick Stats Bar */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-8 md:mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 md:mb-10">
               <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5">
                 <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Toplam</p>
                 <h4 className="text-xl md:text-2xl font-black text-white">{products.length}</h4>
@@ -893,9 +920,13 @@ export function AdminPanel() {
                 <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Kategori</p>
                 <h4 className="text-xl md:text-2xl font-black text-bamm-yellow">{Array.from(new Set(products.map(p => p.category))).length}</h4>
               </div>
-              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 col-span-2 md:col-span-1">
+              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5">
                 <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Popüler</p>
                 <h4 className="text-xl md:text-2xl font-black text-green-400">{products.filter(p => p.isPopular).length}</h4>
+              </div>
+              <div className="bg-[#16191E] p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5">
+                <p className="text-gray-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Tükenenler</p>
+                <h4 className="text-xl md:text-2xl font-black text-red-400">{products.filter(p => p.isSoldOut).length}</h4>
               </div>
             </div>
 
@@ -903,17 +934,19 @@ export function AdminPanel() {
               {/* Toolbar */}
               <div className="p-4 md:p-6 border-b border-white/5 flex flex-col md:flex-row gap-4 items-center justify-between bg-white/[0.01]">
                 <div className="flex gap-2 p-1 bg-black/40 rounded-2xl overflow-x-auto no-scrollbar w-full md:w-auto">
-                  {["Tümü", ...availableCategories.filter(c => products.some(p => p.category === c))].map(cat => (
+                  {["Tümü", ...(products.some(p => p.isSoldOut) ? ["Tükenenler"] : []), ...availableCategories.filter(c => products.some(p => p.category === c))].map(cat => (
                     <button
                       key={cat}
                       onClick={() => setSelectedCategoryFilter(cat)}
                       className={`px-4 md:px-6 py-2 rounded-xl text-[10px] md:text-xs font-bold whitespace-nowrap transition-all ${
                         selectedCategoryFilter === cat 
-                          ? "bg-white text-black shadow-lg scale-105" 
+                          ? cat === "Tükenenler" 
+                            ? "bg-red-500 text-white shadow-lg scale-105" 
+                            : "bg-white text-black shadow-lg scale-105" 
                           : "text-gray-500 hover:text-white"
                       }`}
                     >
-                      {cat}
+                      {cat === "Tükenenler" ? "🔴 Tükenenler" : cat}
                     </button>
                   ))}
                 </div>
@@ -937,24 +970,30 @@ export function AdminPanel() {
                       <th className="px-6 py-4">Ürün Detayı</th>
                       <th className="px-6 py-4">Kategori</th>
                       <th className="px-6 py-4">Fiyat</th>
+                      <th className="px-6 py-4">Stok Durumu (Hızlı Toggle)</th>
                       <th className="px-6 py-4 text-right">Düzenle</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {filteredProducts.map((p) => (
-                      <tr key={p.id} className="group hover:bg-white/[0.02] transition-colors">
+                      <tr key={p.id} className={`group hover:bg-white/[0.02] transition-colors ${p.isSoldOut ? "opacity-75" : ""}`}>
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-black rounded-xl overflow-hidden shrink-0 border border-white/10 p-0.5">
+                            <div className="w-12 h-12 bg-black rounded-xl overflow-hidden shrink-0 border border-white/10 p-0.5 relative">
                               {p.image ? (
                                 <img src={p.image} className="w-full h-full object-cover rounded-lg" alt="" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-white/20 font-black text-xs uppercase">{p.name.substring(0, 2)}</div>
                               )}
+                              {p.isSoldOut && (
+                                <div className="absolute inset-0 bg-black/70 backdrop-blur-[1px] flex items-center justify-center rounded-lg">
+                                  <span className="text-[8px] font-black text-red-400 uppercase tracking-tighter">TÜKENDİ</span>
+                                </div>
+                              )}
                             </div>
                             <div className="flex flex-col">
                               <span className="text-sm font-bold text-white flex items-center gap-2">
-                                {p.name}
+                                <span className={p.isSoldOut ? "line-through text-gray-400" : ""}>{p.name}</span>
                                 {p.isPopular && <Star size={12} className="text-bamm-yellow fill-bamm-yellow" />}
                               </span>
                               <span className="text-xs text-gray-500 truncate max-w-[200px]">{p.description || "Açıklama yok"}</span>
@@ -972,6 +1011,30 @@ export function AdminPanel() {
                         <td className="px-6 py-5 font-black text-bamm-yellow text-sm">
                           {p.price}
                         </td>
+                        <td className="px-6 py-5">
+                          <button
+                            type="button"
+                            onClick={() => toggleSoldOut(p)}
+                            className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider flex items-center gap-2 transition-all border cursor-pointer ${
+                              p.isSoldOut
+                                ? "bg-red-500/15 text-red-400 border-red-500/30 hover:bg-red-500/25 shadow-sm"
+                                : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                            }`}
+                            title="Tıkla: Stok Durumunu Anında Değiştir"
+                          >
+                            {p.isSoldOut ? (
+                              <>
+                                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                🔴 TÜKENDİ
+                              </>
+                            ) : (
+                              <>
+                                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                🟢 STOKTA VAR
+                              </>
+                            )}
+                          </button>
+                        </td>
                         <td className="px-6 py-5 text-right">
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => startEdit(p)} className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-white transition-all"><Edit2 size={14} /></button>
@@ -987,30 +1050,63 @@ export function AdminPanel() {
               {/* Mobile Card View */}
               <div className="md:hidden divide-y divide-white/5">
                  {filteredProducts.map((p) => (
-                   <div key={p.id} className="p-5 flex items-center gap-4 active:bg-white/5 transition-colors">
-                      <div className="w-14 h-14 bg-black rounded-xl overflow-hidden shrink-0 border border-white/10">
-                        {p.image ? (
-                          <img src={p.image} className="w-full h-full object-cover" alt="" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-white/20 font-black text-[10px] uppercase">{p.name.substring(0, 2)}</div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <h4 className="text-xs font-bold text-white truncate uppercase tracking-tight">{p.name}</h4>
-                          {p.isPopular && <Star size={10} className="text-bamm-yellow fill-bamm-yellow" />}
+                   <div key={p.id} className={`p-4 flex flex-col gap-3 active:bg-white/5 transition-colors ${p.isSoldOut ? "bg-red-950/10" : ""}`}>
+                     <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-black rounded-xl overflow-hidden shrink-0 border border-white/10 relative">
+                          {p.image ? (
+                            <img src={p.image} className="w-full h-full object-cover" alt="" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white/20 font-black text-[10px] uppercase">{p.name.substring(0, 2)}</div>
+                          )}
+                          {p.isSoldOut && (
+                            <div className="absolute inset-0 bg-black/75 backdrop-blur-[1px] flex items-center justify-center">
+                              <span className="text-[8px] font-black text-red-400 uppercase tracking-tighter">TÜKENDİ</span>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black text-bamm-yellow">{p.price}</span>
-                          <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest leading-none border-l border-white/10 pl-2">
-                            {p.subcategory ? `${p.category} / ${p.subcategory}` : p.category}
-                          </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <h4 className={`text-xs font-bold uppercase tracking-tight truncate ${p.isSoldOut ? "text-gray-400 line-through" : "text-white"}`}>{p.name}</h4>
+                            {p.isPopular && <Star size={10} className="text-bamm-yellow fill-bamm-yellow" />}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-bamm-yellow">{p.price}</span>
+                            <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest leading-none border-l border-white/10 pl-2">
+                              {p.subcategory ? `${p.category} / ${p.subcategory}` : p.category}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => startEdit(p)} className="w-10 h-10 flex items-center justify-center bg-white/5 rounded-xl text-white"><Edit2 size={14} /></button>
-                        <button onClick={() => setIsDeleting(p.id)} className="w-10 h-10 flex items-center justify-center bg-red-400/10 rounded-xl text-red-400"><Trash2 size={14} /></button>
-                      </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button onClick={() => startEdit(p)} className="w-9 h-9 flex items-center justify-center bg-white/5 rounded-xl text-white"><Edit2 size={14} /></button>
+                          <button onClick={() => setIsDeleting(p.id)} className="w-9 h-9 flex items-center justify-center bg-red-400/10 rounded-xl text-red-400"><Trash2 size={14} /></button>
+                        </div>
+                     </div>
+
+                     {/* Hızlı Stok Tükendi Toggle Butonu (Mobil) */}
+                     <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                       <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Hızlı Stok Durumu</span>
+                       <button
+                         type="button"
+                         onClick={() => toggleSoldOut(p)}
+                         className={`px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center gap-1.5 transition-all border ${
+                           p.isSoldOut
+                             ? "bg-red-500/20 text-red-400 border-red-500/30"
+                             : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                         }`}
+                       >
+                         {p.isSoldOut ? (
+                           <>
+                             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                             🔴 TÜKENDİ (STOKTA YOK)
+                           </>
+                         ) : (
+                           <>
+                             <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                             🟢 STOKTA VAR
+                           </>
+                         )}
+                       </button>
+                     </div>
                    </div>
                  ))}
               </div>
@@ -1654,6 +1750,7 @@ export function AdminPanel() {
                     </div>
                   </div>
                   <button 
+                    type="button"
                     onClick={() => setEditForm({ ...editForm, isPopular: !editForm.isPopular })}
                     className={`w-12 h-7 md:w-14 md:h-8 rounded-full relative transition-all ${
                       editForm.isPopular ? "bg-bamm-yellow" : "bg-white/10"
@@ -1661,6 +1758,31 @@ export function AdminPanel() {
                   >
                     <div className={`absolute top-1 w-5 h-5 md:w-6 md:h-6 rounded-full bg-white transition-all shadow-md ${
                       editForm.isPopular ? "left-6 md:left-7" : "left-1"
+                    }`} />
+                  </button>
+                </div>
+
+                <div className="p-5 md:p-8 bg-white/[0.02] rounded-2xl md:rounded-[32px] border border-white/5 flex items-center justify-between group">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center border transition-all ${
+                      editForm.isSoldOut ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-white/5 border-white/5 text-gray-600"
+                    }`}>
+                      <span className="font-black text-sm">⛔</span>
+                    </div>
+                    <div>
+                      <span className="text-sm md:text-base font-bold block">Stokta Yok / Tükendi?</span>
+                      <span className="text-[10px] md:text-xs text-gray-500">Müşteri menüsünde 'Tükendi' olarak görünür.</span>
+                    </div>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, isSoldOut: !editForm.isSoldOut })}
+                    className={`w-12 h-7 md:w-14 md:h-8 rounded-full relative transition-all ${
+                      editForm.isSoldOut ? "bg-red-500" : "bg-white/10"
+                    }`}
+                  >
+                    <div className={`absolute top-1 w-5 h-5 md:w-6 md:h-6 rounded-full bg-white transition-all shadow-md ${
+                      editForm.isSoldOut ? "left-6 md:left-7" : "left-1"
                     }`} />
                   </button>
                 </div>

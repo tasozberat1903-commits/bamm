@@ -54,7 +54,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { CATEGORIES, MENU_DATA, MenuItem, CAMPAIGNS, EVENTS, HEROSLIDES, HeroSlide } from "../data";
+import { CATEGORIES, MENU_DATA, MenuItem, CAMPAIGNS, EVENTS, HEROSLIDES, HeroSlide, normalizeTurkish } from "../data";
 import { db } from "../lib/firebase";
 import {
   collection,
@@ -153,14 +153,21 @@ export function SearchModal({
 
     setTimeout(() => inputRef.current?.focus(), 100);
 
-    const loadProducts = async () => {
+    const cachedData = localStorage.getItem("bamm_products_cache");
+    if (cachedData) {
       try {
-        const cachedData = localStorage.getItem("bamm_products_cache");
-        if (cachedData) {
-          setProducts(JSON.parse(cachedData));
+        const parsed = JSON.parse(cachedData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProducts(parsed);
         }
+      } catch (e) {
+        console.warn("Cached products parse error:", e);
+      }
+    }
 
-        const snap = await getDocs(collection(db, "products"));
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "products"), (snap) => {
         let dbProducts: any[] = [];
         if (!snap.empty) {
           dbProducts = snap.docs.map((doc) => {
@@ -178,8 +185,8 @@ export function SearchModal({
 
         const merged = [...MENU_DATA];
         dbProducts.forEach((dbP) => {
-          const idx = merged.findIndex((m) => m.id === dbP.id);
-          if (idx !== -1) merged[idx] = dbP;
+          const idx = merged.findIndex((m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase()));
+          if (idx !== -1) merged[idx] = { ...merged[idx], ...dbP };
           else merged.push(dbP);
         });
 
@@ -187,23 +194,35 @@ export function SearchModal({
         setProducts(filteredLiveMenu);
         localStorage.setItem("bamm_products_cache", JSON.stringify(filteredLiveMenu));
         localStorage.setItem("bamm_products_cache_time", String(Date.now()));
-      } catch (error) {
+      }, (error) => {
         console.warn("SearchModal products fetch error:", error);
+      });
+    } catch (e) {
+      console.warn("SearchModal products sub error:", e);
+    }
+
+    return () => {
+      if (unsub) {
+        try {
+          unsub();
+        } catch (e) {
+          console.warn("SearchModal unsub error:", e);
+        }
       }
     };
-
-    loadProducts();
   }, [isOpen]);
 
+  const normQuery = normalizeTurkish(query);
   const results =
-    query.trim() === ""
+    normQuery === ""
       ? []
-      : products.filter(
-          (item) =>
-            item.name.toLowerCase().includes(query.toLowerCase()) ||
-            (item.description && item.description.toLowerCase().includes(query.toLowerCase())) ||
-            (item.category && item.category.toLowerCase().includes(query.toLowerCase())),
-        ).slice(0, 8);
+      : products.filter((item) => {
+          const nameMatch = normalizeTurkish(item.name).includes(normQuery);
+          const descMatch = normalizeTurkish(item.description).includes(normQuery);
+          const catMatch = normalizeTurkish(item.category).includes(normQuery);
+          const subcatMatch = normalizeTurkish(item.subcategory).includes(normQuery);
+          return nameMatch || descMatch || catMatch || subcatMatch;
+        }).slice(0, 8);
 
   return (
     <AnimatePresence>
@@ -246,11 +265,23 @@ export function SearchModal({
                 }}
                 className="bg-white/5 p-4 rounded-2xl flex items-center gap-4 border border-white/5 active:bg-white/10 transition-colors"
               >
-                <div className="w-12 h-12 rounded-xl bg-bamm-yellow/10 flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-bamm-yellow/10 flex items-center justify-center shrink-0 relative overflow-hidden">
                   <Star size={20} className="text-bamm-yellow" />
+                  {item.isSoldOut && (
+                    <div className="absolute inset-0 bg-red-900/80 backdrop-blur-[1px] flex items-center justify-center">
+                      <span className="text-[7px] font-black text-white uppercase">TÜKENDİ</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-white font-bold truncate">{item.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className={`font-bold truncate ${item.isSoldOut ? "text-gray-400 line-through" : "text-white"}`}>{item.name}</h4>
+                    {item.isSoldOut && (
+                      <span className="text-[9px] font-black uppercase text-red-400 bg-red-950/80 border border-red-500/30 px-1.5 py-0.2 rounded shrink-0">
+                        TÜKENDİ
+                      </span>
+                    )}
+                  </div>
                   <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">
                     {item.category}
                   </p>
@@ -539,45 +570,49 @@ export function HomeSection({
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
-    const cachedTime = localStorage.getItem("bamm_categories_cache_time");
     const cachedData = localStorage.getItem("bamm_categories_cache");
-    let hasFreshCache = false;
-
-    if (cachedData && cachedTime) {
+    if (cachedData) {
       try {
-        setDbCategories(JSON.parse(cachedData));
-        // 30 seconds cache expiry
-        if (Date.now() - Number(cachedTime) < 30 * 1000) {
-          hasFreshCache = true;
+        const parsed = JSON.parse(cachedData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setDbCategories(parsed);
         }
       } catch (e) {
         console.error(e);
       }
     }
-    
-    if (hasFreshCache) {
-      return;
-    }
-    
-    const fetchFresh = async () => {
-      try {
-        const snap = await getDocs(collection(db, "categories"));
+
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "categories"), (snap) => {
         if (!snap.empty) {
           const cats = snap.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as any))
-            .filter(cat => !cat.deleted)
+            .map((doc) => ({ id: doc.id, ...doc.data() } as any))
+            .filter((cat) => !cat.deleted)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
           setDbCategories(cats);
           localStorage.setItem("bamm_categories_cache", JSON.stringify(cats));
           localStorage.setItem("bamm_categories_cache_time", String(Date.now()));
+        } else {
+          setDbCategories([]);
         }
-      } catch (e) {
-        console.error(e);
-        setIsOffline(true);
+        setIsOffline(false);
+      }, (error) => {
+        console.warn("HomeSection categories onSnapshot error:", error);
+      });
+    } catch (e) {
+      console.warn("HomeSection categories sub error:", e);
+    }
+
+    return () => {
+      if (unsub) {
+        try {
+          unsub();
+        } catch (e) {
+          console.warn("HomeSection unsub error:", e);
+        }
       }
     };
-    
-    fetchFresh();
   }, []);
 
   const scrollHero = (direction: 'left' | 'right') => {
@@ -1112,44 +1147,51 @@ export function MenuSection({
     setSelectedSubcategory("Tümü");
   }, [selectedCategory]);
 
-  const CACHE_EXPIRY_MS = 30 * 1000; // 30 seconds cache expiry
-
   useEffect(() => {
-    const loadCategories = async () => {
+    const cachedData = localStorage.getItem("bamm_categories_cache");
+    if (cachedData) {
       try {
-        const cachedData = localStorage.getItem("bamm_categories_cache");
-        const cachedTime = localStorage.getItem("bamm_categories_cache_time");
-        
-        if (cachedData && cachedTime) {
-          const parsed = JSON.parse(cachedData);
+        const parsed = JSON.parse(cachedData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
           setDbCategories(parsed);
-          
-          if (Date.now() - Number(cachedTime) < CACHE_EXPIRY_MS) {
-            return;
-          }
         }
-        
-        const snap = await getDocs(collection(db, "categories"));
+      } catch (e) {
+        console.warn("Cached categories parse error:", e);
+      }
+    }
+
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "categories"), (snap) => {
         if (!snap.empty) {
           const cats = snap.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as any))
-            .filter(cat => !cat.deleted)
+            .map((doc) => ({ id: doc.id, ...doc.data() } as any))
+            .filter((cat) => !cat.deleted)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
           setDbCategories(cats);
           localStorage.setItem("bamm_categories_cache", JSON.stringify(cats));
           localStorage.setItem("bamm_categories_cache_time", String(Date.now()));
         } else {
           setDbCategories([]);
-          localStorage.setItem("bamm_categories_cache", JSON.stringify([]));
-          localStorage.setItem("bamm_categories_cache_time", String(Date.now()));
         }
-      } catch (error) {
-        console.warn("Firestore categories fetch error: ", error);
+      }, (error) => {
+        console.warn("Firestore categories live subscription error: ", error);
         setIsOffline(true);
+      });
+    } catch (e) {
+      console.warn("Firestore categories fetch error: ", e);
+      setIsOffline(true);
+    }
+
+    return () => {
+      if (unsub) {
+        try {
+          unsub();
+        } catch (e) {
+          console.warn("Categories unsub error:", e);
+        }
       }
     };
-
-    loadCategories();
   }, []);
 
   const dynamicCategories = Array.from(
@@ -1179,21 +1221,23 @@ export function MenuSection({
   };
 
   useEffect(() => {
-    const loadProducts = async () => {
+    // 1. Instantly display cached data if available for zero load time
+    const cachedData = localStorage.getItem("bamm_products_cache");
+    if (cachedData) {
       try {
-        const cachedData = localStorage.getItem("bamm_products_cache");
-        const cachedTime = localStorage.getItem("bamm_products_cache_time");
-        
-        if (cachedData && cachedTime) {
-          const parsed = JSON.parse(cachedData);
+        const parsed = JSON.parse(cachedData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
           setLiveMenu(parsed);
-          
-          if (Date.now() - Number(cachedTime) < CACHE_EXPIRY_MS) {
-            return;
-          }
         }
-        
-        const snap = await getDocs(collection(db, "products"));
+      } catch (e) {
+        console.warn("Cached products parse error:", e);
+      }
+    }
+
+    // 2. Real-time onSnapshot listener for instant live price updates
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "products"), (snap) => {
         let dbProducts: any[] = [];
         if (!snap.empty) {
           dbProducts = snap.docs.map((doc) => {
@@ -1211,22 +1255,37 @@ export function MenuSection({
         
         const merged = [...MENU_DATA];
         dbProducts.forEach((dbP) => {
-          const idx = merged.findIndex((m) => m.id === dbP.id);
-          if (idx !== -1) merged[idx] = dbP;
-          else merged.push(dbP);
+          const idx = merged.findIndex((m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase()));
+          if (idx !== -1) {
+            merged[idx] = { ...merged[idx], ...dbP };
+          } else {
+            merged.push(dbP);
+          }
         });
 
         const filteredLiveMenu = merged.filter(p => !p.deleted);
         setLiveMenu(filteredLiveMenu);
         localStorage.setItem("bamm_products_cache", JSON.stringify(filteredLiveMenu));
         localStorage.setItem("bamm_products_cache_time", String(Date.now()));
-      } catch (error) {
-        console.warn("Firestore products fetch error: ", error);
+        setIsOffline(false);
+      }, (error) => {
+        console.warn("Firestore products live subscription error: ", error);
         setIsOffline(true);
+      });
+    } catch (error) {
+      console.warn("Firestore products fetch error: ", error);
+      setIsOffline(true);
+    }
+
+    return () => {
+      if (unsub) {
+        try {
+          unsub();
+        } catch (e) {
+          console.warn("Products unsub error:", e);
+        }
       }
     };
-
-    loadProducts();
   }, []);
 
   const categorySubcategories = useMemo(() => {
@@ -1253,7 +1312,7 @@ export function MenuSection({
   const filteredItems = liveMenu.filter((item) => {
     const matchesCategory =
       selectedCategory === "Popüler"
-        ? item.isPopular
+        ? Boolean(item.isPopular)
         : item.category === selectedCategory;
 
     let matchesSubcategory = true;
@@ -1261,9 +1320,17 @@ export function MenuSection({
       matchesSubcategory = item.subcategory === selectedSubcategory;
     }
 
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const normSearch = normalizeTurkish(searchQuery);
+    if (!normSearch) {
+      return matchesCategory && matchesSubcategory;
+    }
+
+    const nameMatch = normalizeTurkish(item.name).includes(normSearch);
+    const descMatch = normalizeTurkish(item.description).includes(normSearch);
+    const catMatch = normalizeTurkish(item.category).includes(normSearch);
+    const subcatMatch = normalizeTurkish(item.subcategory).includes(normSearch);
+    const matchesSearch = nameMatch || descMatch || catMatch || subcatMatch;
+
     return matchesCategory && matchesSubcategory && matchesSearch;
   });
 
@@ -1524,7 +1591,9 @@ export function MenuSection({
                             transition={{ delay: idx * 0.03 }}
                             key={item.id}
                             onClick={() => onProductClick(item)}
-                            className="bg-white rounded-[32px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-black/[0.04] flex items-center gap-5 relative group active:scale-[0.98] transition-all cursor-pointer overflow-hidden"
+                            className={`rounded-[32px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border flex items-center gap-5 relative group active:scale-[0.98] transition-all cursor-pointer overflow-hidden ${
+                              item.isSoldOut ? "bg-red-50/20 border-red-200/60" : "bg-white border-black/[0.04]"
+                            }`}
                           >
                             <div className="absolute right-0 top-0 w-32 h-32 bg-gray-50 rounded-full blur-[40px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
@@ -1533,7 +1602,7 @@ export function MenuSection({
                                 <img
                                   src={item.image}
                                   alt={item.name}
-                                  className="w-full h-full object-cover"
+                                  className={`w-full h-full object-cover ${item.isSoldOut ? "grayscale-[0.3]" : ""}`}
                                 />
                               ) : (
                                 <ItemIcon
@@ -1543,11 +1612,17 @@ export function MenuSection({
                                 />
                               )}
 
-                              {item.isPopular && (
+                              {item.isSoldOut ? (
+                                <div className="absolute inset-0 bg-black/65 backdrop-blur-[1px] flex items-center justify-center p-1 text-center z-10">
+                                  <span className="text-[8px] font-black text-white uppercase tracking-tighter bg-red-600 px-1.5 py-0.5 rounded shadow">
+                                    TÜKENDİ
+                                  </span>
+                                </div>
+                              ) : item.isPopular ? (
                                 <div className="absolute -top-2 -right-2 bg-bamm-yellow text-black p-1.5 rounded-xl shadow-sm rotate-12 group-hover:rotate-0 transition-transform">
                                   <Star size={10} fill="currentColor" />
                                 </div>
-                              )}
+                              ) : null}
                             </div>
 
                             <div className="flex-1 min-w-0 flex flex-col justify-center pb-1">
@@ -1555,8 +1630,13 @@ export function MenuSection({
                                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#B49E72] bg-[#FFF8D6]/30 px-2 py-0.5 rounded-md">
                                   {subcat}
                                 </span>
+                                {item.isSoldOut && (
+                                  <span className="text-[9px] font-black uppercase tracking-[0.15em] text-red-600 bg-red-100/90 px-2 py-0.5 rounded-md border border-red-200">
+                                    STOKTA YOK
+                                  </span>
+                                )}
                               </div>
-                              <h3 className="text-base font-bold text-gray-900 leading-tight mb-2 pr-4">
+                              <h3 className={`text-base font-bold leading-tight mb-2 pr-4 ${item.isSoldOut ? "text-gray-400 line-through decoration-red-500/50" : "text-gray-900"}`}>
                                 {item.name}
                               </h3>
                               <p className="text-[11px] text-gray-500 line-clamp-1 leading-relaxed max-w-[90%]">
@@ -1566,7 +1646,7 @@ export function MenuSection({
 
                             <div className="flex flex-col items-end gap-3 pl-2 relative z-10 flex-shrink-0">
                               <div className="flex items-baseline gap-0.5">
-                                <span className="text-[22px] font-black text-gray-900 tracking-tighter">
+                                <span className={`text-[22px] font-black tracking-tighter ${item.isSoldOut ? "text-gray-400" : "text-gray-900"}`}>
                                   {item.price.replace(/ TL|₺/g, "")}
                                 </span>
                                 <span className="text-[10px] font-bold text-gray-400">
@@ -1598,7 +1678,9 @@ export function MenuSection({
                     transition={{ delay: idx * 0.03 }}
                     key={item.id}
                     onClick={() => onProductClick(item)}
-                    className="bg-white rounded-[32px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-black/[0.04] flex items-center gap-5 relative group active:scale-[0.98] transition-all cursor-pointer overflow-hidden"
+                    className={`rounded-[32px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border flex items-center gap-5 relative group active:scale-[0.98] transition-all cursor-pointer overflow-hidden ${
+                      item.isSoldOut ? "bg-red-50/20 border-red-200/60" : "bg-white border-black/[0.04]"
+                    }`}
                   >
                     <div className="absolute right-0 top-0 w-32 h-32 bg-gray-50 rounded-full blur-[40px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
@@ -1607,7 +1689,7 @@ export function MenuSection({
                         <img
                           src={item.image}
                           alt={item.name}
-                          className="w-full h-full object-cover"
+                          className={`w-full h-full object-cover ${item.isSoldOut ? "grayscale-[0.3]" : ""}`}
                         />
                       ) : (
                         <ItemIcon
@@ -1617,11 +1699,17 @@ export function MenuSection({
                         />
                       )}
 
-                      {item.isPopular && (
+                      {item.isSoldOut ? (
+                        <div className="absolute inset-0 bg-black/65 backdrop-blur-[1px] flex items-center justify-center p-1 text-center z-10">
+                          <span className="text-[8px] font-black text-white uppercase tracking-tighter bg-red-600 px-1.5 py-0.5 rounded shadow">
+                            TÜKENDİ
+                          </span>
+                        </div>
+                      ) : item.isPopular ? (
                         <div className="absolute -top-2 -right-2 bg-bamm-yellow text-black p-1.5 rounded-xl shadow-sm rotate-12 group-hover:rotate-0 transition-transform">
                           <Star size={10} fill="currentColor" />
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="flex-1 min-w-0 flex flex-col justify-center pb-1">
@@ -1629,8 +1717,13 @@ export function MenuSection({
                         <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md">
                           {CATEGORY_LABELS[item.category] || item.category}
                         </span>
+                        {item.isSoldOut && (
+                          <span className="text-[9px] font-black uppercase tracking-[0.15em] text-red-600 bg-red-100/90 px-2 py-0.5 rounded-md border border-red-200">
+                            STOKTA YOK
+                          </span>
+                        )}
                       </div>
-                      <h3 className="text-base font-bold text-gray-900 leading-tight mb-2 pr-4">
+                      <h3 className={`text-base font-bold leading-tight mb-2 pr-4 ${item.isSoldOut ? "text-gray-400 line-through decoration-red-500/50" : "text-gray-900"}`}>
                         {item.name}
                       </h3>
                       <p className="text-[11px] text-gray-500 line-clamp-1 leading-relaxed max-w-[90%]">
@@ -1640,7 +1733,7 @@ export function MenuSection({
 
                     <div className="flex flex-col items-end gap-3 pl-2 relative z-10 flex-shrink-0">
                       <div className="flex items-baseline gap-0.5">
-                        <span className="text-[22px] font-black text-gray-900 tracking-tighter">
+                        <span className={`text-[22px] font-black tracking-tighter ${item.isSoldOut ? "text-gray-400" : "text-gray-900"}`}>
                           {item.price.replace(/ TL|₺/g, "")}
                         </span>
                         <span className="text-[10px] font-bold text-gray-400">
@@ -2191,18 +2284,35 @@ export function ProductDetail({
 
           {/* Premium Details Section */}
           <div className="relative z-10 flex-1 bg-[#F5F5F3] rounded-t-[50px] shadow-[0_-20px_40px_rgba(0,0,0,0.1)] px-8 pt-10 flex flex-col mt-[-30px] min-h-[500px]">
+            {product.isSoldOut && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200/80 rounded-2xl flex items-center gap-3 text-red-700 shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center shrink-0 text-red-600 font-black text-base">
+                  ⛔
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-red-800">Geçici Olarak Temin Edilemiyor</h4>
+                  <p className="text-[11px] font-medium text-red-600 leading-snug">Bu ürünümüz tükenmiştir. En kısa sürede tekrar stoklarımızda olacaktır.</p>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between items-start mb-8">
               <div className="space-y-1">
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                <h2 className={`text-2xl font-black tracking-tight ${product.isSoldOut ? "text-gray-400 line-through decoration-red-500" : "text-gray-900"}`}>
                   {product.name}
                 </h2>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-[#AD1519] bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
                     {product.category}
                   </span>
+                  {product.isSoldOut && (
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white bg-red-600 px-2.5 py-0.5 rounded-full shadow-sm">
+                      STOKTA YOK
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="text-2xl font-black text-[#AD1519]">
+              <div className={`text-2xl font-black ${product.isSoldOut ? "text-gray-400" : "text-[#AD1519]"}`}>
                 {product.price}
               </div>
             </div>
