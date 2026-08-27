@@ -180,6 +180,20 @@ export function AdminPanel() {
   const availableCategories = dbCategories.length > 0 ? dbCategories.map(c => c.name) : CATEGORIES;
 
   const [showCustomSubcategoryInput, setShowCustomSubcategoryInput] = useState(false);
+  const [selectedSubcategoryFilter, setSelectedSubcategoryFilter] = useState<string>("Tümü");
+
+  const availableSubcategoriesForFilter = useMemo(() => {
+    if (!selectedCategoryFilter || selectedCategoryFilter === "Tümü" || selectedCategoryFilter === "Tükenenler") {
+      return [];
+    }
+    return (Array.from(
+      new Set(
+        products
+          .filter((p) => p.category === selectedCategoryFilter && p.subcategory)
+          .map((p) => p.subcategory as string)
+      )
+    ) as string[]).sort((a, b) => a.localeCompare(b));
+  }, [products, selectedCategoryFilter]);
 
   const currentCategorySubcategories = useMemo(() => {
     if (!editForm.category) return [];
@@ -687,12 +701,24 @@ export function AdminPanel() {
     return map;
   }, []);
 
+  const getCategorySiblingDefaultRank = (item: MenuItem) => {
+    const categorySiblingsInMenuData = MENU_DATA.filter(m => m.category === item.category);
+    const siblingIdx = categorySiblingsInMenuData.findIndex(
+      m => m.id === item.id || (m.name && item.name && m.name.trim().toLowerCase() === item.name.trim().toLowerCase())
+    );
+    if (siblingIdx !== -1) {
+      return (siblingIdx + 1) * 100;
+    }
+    const globalIdx = defaultIndexMap.get(item.id) ?? 99;
+    return 1000 + globalIdx;
+  };
+
   const getProductRank = (item: MenuItem): number => {
     if (item.order !== undefined && item.order !== null && (item.order as any) !== "") {
       const num = Number(item.order);
       if (!isNaN(num)) return num;
     }
-    return defaultIndexMap.get(item.id) ?? 9999;
+    return getCategorySiblingDefaultRank(item);
   };
 
   const moveProduct = async (product: MenuItem, direction: 'up' | 'down') => {
@@ -940,14 +966,24 @@ export function AdminPanel() {
       } else {
         matchesCat = p.category === selectedCategoryFilter;
       }
+
+      let matchesSubcat = true;
+      if (
+        selectedCategoryFilter !== "Tümü" &&
+        selectedCategoryFilter !== "Tükenenler" &&
+        selectedSubcategoryFilter !== "Tümü"
+      ) {
+        matchesSubcat = p.subcategory === selectedSubcategoryFilter;
+      }
+
       const normSearch = normalizeTurkish(searchQuery);
-      if (!normSearch) return matchesCat;
+      if (!normSearch) return matchesCat && matchesSubcat;
       
       const nameMatch = normalizeTurkish(p.name).includes(normSearch);
       const catMatch = normalizeTurkish(p.category).includes(normSearch);
       const descMatch = normalizeTurkish(p.description).includes(normSearch);
       const subcatMatch = normalizeTurkish(p.subcategory).includes(normSearch);
-      return matchesCat && (nameMatch || catMatch || descMatch || subcatMatch);
+      return matchesCat && matchesSubcat && (nameMatch || catMatch || descMatch || subcatMatch);
     })
     .sort((a, b) => {
       if (a.category === b.category) {
@@ -1119,7 +1155,10 @@ export function AdminPanel() {
                   {["Tümü", ...(products.some(p => p.isSoldOut) ? ["Tükenenler"] : []), ...availableCategories.filter(c => products.some(p => p.category === c))].map(cat => (
                     <button
                       key={cat}
-                      onClick={() => setSelectedCategoryFilter(cat)}
+                      onClick={() => {
+                        setSelectedCategoryFilter(cat);
+                        setSelectedSubcategoryFilter("Tümü");
+                      }}
                       className={`px-4 md:px-6 py-2 rounded-xl text-[10px] md:text-xs font-bold whitespace-nowrap transition-all ${
                         selectedCategoryFilter === cat 
                           ? cat === "Tükenenler" 
@@ -1157,6 +1196,39 @@ export function AdminPanel() {
                   </div>
                 </div>
               </div>
+
+              {/* Subcategories Filter Bar */}
+              {availableSubcategoriesForFilter.length > 0 && (
+                <div className="px-4 md:px-6 py-3 border-b border-white/5 flex items-center gap-2 overflow-x-auto no-scrollbar bg-black/30">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-bamm-yellow shrink-0 mr-1 flex items-center gap-1.5 bg-bamm-yellow/10 px-2.5 py-1 rounded-lg border border-bamm-yellow/20">
+                    <Filter size={12} className="text-bamm-yellow" /> Alt Kategoriler:
+                  </span>
+                  {["Tümü", ...availableSubcategoriesForFilter].map((subcat) => {
+                    const count = subcat === "Tümü" 
+                      ? products.filter(p => p.category === selectedCategoryFilter).length 
+                      : products.filter(p => p.category === selectedCategoryFilter && p.subcategory === subcat).length;
+                    return (
+                      <button
+                        key={subcat}
+                        type="button"
+                        onClick={() => setSelectedSubcategoryFilter(subcat)}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all border cursor-pointer flex items-center gap-1.5 ${
+                          selectedSubcategoryFilter === subcat
+                            ? "bg-bamm-yellow text-black border-bamm-yellow shadow-md scale-105"
+                            : "bg-white/5 text-gray-400 border-white/10 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <span>{subcat}</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded-full ${
+                          selectedSubcategoryFilter === subcat ? "bg-black/20 text-black font-black" : "bg-white/10 text-gray-400"
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Desktop Table View */}
               <div className="hidden md:block p-4 overflow-x-auto">

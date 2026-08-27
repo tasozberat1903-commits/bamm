@@ -1281,12 +1281,24 @@ export function MenuSection({
         const defaultIndexMap = new Map<string, number>();
         MENU_DATA.forEach((m, idx) => defaultIndexMap.set(m.id, idx));
 
+        const getCategorySiblingDefaultRank = (item: MenuItem) => {
+          const categorySiblingsInMenuData = MENU_DATA.filter(m => m.category === item.category);
+          const siblingIdx = categorySiblingsInMenuData.findIndex(
+            m => m.id === item.id || (m.name && item.name && m.name.trim().toLowerCase() === item.name.trim().toLowerCase())
+          );
+          if (siblingIdx !== -1) {
+            return (siblingIdx + 1) * 100;
+          }
+          const globalIdx = defaultIndexMap.get(item.id) ?? 99;
+          return 1000 + globalIdx;
+        };
+
         const getRank = (item: MenuItem) => {
           if (item.order !== undefined && item.order !== null && (item.order as any) !== "") {
             const num = Number(item.order);
             if (!isNaN(num)) return num;
           }
-          return defaultIndexMap.get(item.id) ?? 9999;
+          return getCategorySiblingDefaultRank(item);
         };
 
         const filteredLiveMenu = merged
