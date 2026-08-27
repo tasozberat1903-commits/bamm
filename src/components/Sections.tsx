@@ -1282,8 +1282,9 @@ export function MenuSection({
         MENU_DATA.forEach((m, idx) => defaultIndexMap.set(m.id, idx));
 
         const getRank = (item: MenuItem) => {
-          if (typeof item.order === 'number' && !isNaN(item.order)) {
-            return item.order;
+          if (item.order !== undefined && item.order !== null && (item.order as any) !== "") {
+            const num = Number(item.order);
+            if (!isNaN(num)) return num;
           }
           return defaultIndexMap.get(item.id) ?? 9999;
         };
