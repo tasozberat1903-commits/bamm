@@ -1271,7 +1271,7 @@ export function MenuSection({
             (m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase() && (!dbP.category || m.category === dbP.category))
           );
           if (idx !== -1) {
-            merged[idx] = { ...merged[idx], ...dbP, id: merged[idx].id || dbP.id };
+            merged[idx] = { ...merged[idx], ...dbP, id: dbP.id || merged[idx].id };
           } else {
             merged.push(dbP);
           }
@@ -1287,10 +1287,10 @@ export function MenuSection({
             m => m.id === item.id || (m.name && item.name && m.name.trim().toLowerCase() === item.name.trim().toLowerCase())
           );
           if (siblingIdx !== -1) {
-            return (siblingIdx + 1) * 100;
+            return (siblingIdx + 1) * 10;
           }
           const globalIdx = defaultIndexMap.get(item.id) ?? 99;
-          return 1000 + globalIdx;
+          return 500 + globalIdx;
         };
 
         const getRank = (item: MenuItem) => {

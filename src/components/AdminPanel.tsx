@@ -232,7 +232,7 @@ export function AdminPanel() {
             const idx = merged.findIndex(
               (m) => m.id === dbP.id || (m.name && dbP.name && m.name.trim().toLowerCase() === dbP.name.trim().toLowerCase() && (!dbP.category || m.category === dbP.category))
             );
-            if (idx !== -1) merged[idx] = { ...merged[idx], ...dbP, id: merged[idx].id || dbP.id };
+            if (idx !== -1) merged[idx] = { ...merged[idx], ...dbP, id: dbP.id || merged[idx].id };
             else merged.push(dbP);
           });
 
@@ -550,13 +550,41 @@ export function AdminPanel() {
     }
   };
 
-  const confirmDelete = async (id: string) => {
+  const confirmDelete = async (targetId: string) => {
+    const productToDelete = products.find((p) => p.id === targetId);
+
+    // Optimistic UI update immediately
+    setProducts((prev) =>
+      prev.filter((p) => p.id !== targetId && (!productToDelete?.name || p.name.trim().toLowerCase() !== productToDelete.name.trim().toLowerCase()))
+    );
+    setIsDeleting(null);
+
     try {
-      await setDoc(doc(db, "products", id), { deleted: true }, { merge: true });
-      setIsDeleting(null);
+      // 1. Delete document directly from Firestore
+      await deleteDoc(doc(db, "products", targetId)).catch(() => {});
+
+      // 2. Also soft-delete in Firestore as fallback
+      await setDoc(doc(db, "products", targetId), { deleted: true }, { merge: true }).catch(() => {});
+
+      // 3. Search Firestore for any duplicate docs by ID or name and clean them up
+      if (productToDelete && productToDelete.name) {
+        const normName = productToDelete.name.trim().toLowerCase();
+        const snap = await getDocs(collection(db, "products")).catch(() => null);
+        if (snap) {
+          for (const d of snap.docs) {
+            const data = d.data();
+            if (d.id === targetId || (data.name && data.name.trim().toLowerCase() === normName)) {
+              await deleteDoc(doc(db, "products", d.id)).catch(() => {});
+              await setDoc(doc(db, "products", d.id), { deleted: true }, { merge: true }).catch(() => {});
+            }
+          }
+        }
+      }
+
       clearMenuCaches();
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, `products/${id}`);
+      console.warn("Delete product error:", e);
+      handleFirestoreError(e, OperationType.WRITE, `products/${targetId}`, false);
     }
   };
 
@@ -707,10 +735,10 @@ export function AdminPanel() {
       m => m.id === item.id || (m.name && item.name && m.name.trim().toLowerCase() === item.name.trim().toLowerCase())
     );
     if (siblingIdx !== -1) {
-      return (siblingIdx + 1) * 100;
+      return (siblingIdx + 1) * 10;
     }
     const globalIdx = defaultIndexMap.get(item.id) ?? 99;
-    return 1000 + globalIdx;
+    return 500 + globalIdx;
   };
 
   const getProductRank = (item: MenuItem): number => {
@@ -722,17 +750,17 @@ export function AdminPanel() {
   };
 
   const moveProduct = async (product: MenuItem, direction: 'up' | 'down') => {
-    const siblings = products
+    const categoryProducts = products
       .filter((p) => p.category === product.category)
       .sort((a, b) => getProductRank(a) - getProductRank(b));
 
-    const currentIndex = siblings.findIndex((p) => p.id === product.id);
+    const currentIndex = categoryProducts.findIndex((p) => p.id === product.id);
     if (currentIndex === -1) return;
 
     const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= siblings.length) return;
+    if (targetIndex < 0 || targetIndex >= categoryProducts.length) return;
 
-    const swapped = [...siblings];
+    const swapped = [...categoryProducts];
     const temp = swapped[currentIndex];
     swapped[currentIndex] = swapped[targetIndex];
     swapped[targetIndex] = temp;
@@ -777,33 +805,61 @@ export function AdminPanel() {
     }
   };
 
-  const quickUpdateOrder = async (p: MenuItem, newOrder: number) => {
-    if (isNaN(newOrder) || newOrder === p.order) return;
+  const quickUpdatePosition = async (product: MenuItem, targetPos: number) => {
+    if (isNaN(targetPos) || targetPos < 1) return;
+
+    const categoryProducts = products
+      .filter((p) => p.category === product.category)
+      .sort((a, b) => getProductRank(a) - getProductRank(b));
+
+    const currentIdx = categoryProducts.findIndex((p) => p.id === product.id);
+    if (currentIdx === -1) return;
+
+    const currentPos = currentIdx + 1;
+    if (currentPos === targetPos) return;
+
+    const listWithoutItem = categoryProducts.filter((p) => p.id !== product.id);
+    const insertIdx = Math.max(0, Math.min(targetPos - 1, listWithoutItem.length));
+    listWithoutItem.splice(insertIdx, 0, product);
+
+    const reorderedList = listWithoutItem;
+    const updatedOrders = new Map<string, number>();
+    reorderedList.forEach((item, idx) => {
+      updatedOrders.set(item.id, (idx + 1) * 10);
+    });
 
     setProducts((prev) =>
-      prev.map((item) => (item.id === p.id ? { ...item, order: newOrder } : item))
+      prev.map((item) => {
+        if (updatedOrders.has(item.id)) {
+          return { ...item, order: updatedOrders.get(item.id) };
+        }
+        return item;
+      })
     );
 
     try {
-      const itemData: any = {
-        name: p.name,
-        price: p.price,
-        category: p.category,
-        order: newOrder,
-        deleted: false
-      };
-      if (p.description) itemData.description = p.description;
-      if (p.subcategory) itemData.subcategory = p.subcategory;
-      if (p.image) itemData.image = p.image;
-      if (p.isPopular !== undefined) itemData.isPopular = p.isPopular;
-      if (p.isSoldOut !== undefined) itemData.isSoldOut = p.isSoldOut;
+      const writes = reorderedList.map((item, idx) => {
+        const newOrd = (idx + 1) * 10;
+        const itemData: any = {
+          name: item.name,
+          price: item.price,
+          category: item.category,
+          order: newOrd,
+          deleted: false
+        };
+        if (item.description) itemData.description = item.description;
+        if (item.subcategory) itemData.subcategory = item.subcategory;
+        if (item.image) itemData.image = item.image;
+        if (item.isPopular !== undefined) itemData.isPopular = item.isPopular;
+        if (item.isSoldOut !== undefined) itemData.isSoldOut = item.isSoldOut;
 
-      const ref = doc(db, "products", p.id);
-      await setDoc(ref, itemData, { merge: true });
+        return setDoc(doc(db, "products", item.id), itemData, { merge: true });
+      });
+      await Promise.all(writes);
       clearMenuCaches();
     } catch (e: any) {
       console.warn("Sıra güncelleme hatası:", e);
-      handleFirestoreError(e, OperationType.WRITE, `products/${p.id}`, false);
+      handleFirestoreError(e, OperationType.WRITE, `products/${product.id}`, false);
     }
   };
 
@@ -1281,38 +1337,61 @@ export function AdminPanel() {
                           {p.price}
                         </td>
                         <td className="px-6 py-5">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => moveProduct(p, 'up')}
-                              className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/15 rounded-lg text-gray-300 hover:text-white transition-all border border-white/10 cursor-pointer"
-                              title="Menüde Yukarı Taşı"
-                            >
-                              <ArrowUp size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => moveProduct(p, 'down')}
-                              className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/15 rounded-lg text-gray-300 hover:text-white transition-all border border-white/10 cursor-pointer"
-                              title="Menüde Aşağı Taşı"
-                            >
-                              <ArrowDown size={13} />
-                            </button>
-                            <input
-                              type="number"
-                              defaultValue={p.order !== undefined ? p.order : ""}
-                              key={`${p.id}-order-${p.order}`}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  (e.target as HTMLInputElement).blur();
-                                }
-                              }}
-                              onBlur={(e) => quickUpdateOrder(p, Number(e.target.value))}
-                              className="w-14 bg-black/50 border border-white/10 hover:border-white/30 focus:border-bamm-yellow rounded-lg px-2 py-1.5 text-center text-xs font-bold text-gray-300 focus:outline-none transition-all"
-                              placeholder="Sıra"
-                              title="Doğrudan Sıra No girin"
-                            />
-                          </div>
+                          {(() => {
+                            const categorySiblings = products
+                              .filter((item) => item.category === p.category)
+                              .sort((a, b) => getProductRank(a) - getProductRank(b));
+                            const pIndex = categorySiblings.findIndex((item) => item.id === p.id);
+                            const posNum = pIndex !== -1 ? pIndex + 1 : 1;
+                            const isFirst = pIndex <= 0;
+                            const isLast = pIndex >= categorySiblings.length - 1;
+
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => moveProduct(p, 'up')}
+                                  disabled={isFirst}
+                                  className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/15 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg text-gray-300 hover:text-white transition-all border border-white/10 cursor-pointer"
+                                  title={isFirst ? "Zaten En Üstte" : "Yukarı Taşı"}
+                                >
+                                  <ArrowUp size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveProduct(p, 'down')}
+                                  disabled={isLast}
+                                  className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/15 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg text-gray-300 hover:text-white transition-all border border-white/10 cursor-pointer"
+                                  title={isLast ? "Zaten En Altta" : "Aşağı Taşı"}
+                                >
+                                  <ArrowDown size={13} />
+                                </button>
+                                <div className="flex items-center gap-1 bg-black/50 border border-white/10 hover:border-white/30 focus-within:border-bamm-yellow rounded-lg px-2 py-1">
+                                  <span className="text-[10px] font-bold text-gray-500">Sıra:</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={categorySiblings.length}
+                                    defaultValue={posNum}
+                                    key={`${p.id}-pos-${posNum}`}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    onBlur={(e) => {
+                                      const val = Number((e.target as HTMLInputElement).value);
+                                      if (!isNaN(val) && val !== posNum) {
+                                        quickUpdatePosition(p, val);
+                                      }
+                                    }}
+                                    className="w-10 bg-transparent text-center text-xs font-black text-bamm-yellow focus:outline-none"
+                                    title="Sıra Numarasını Girin (örneğin: 1, 2, 3...)"
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-6 py-5">
                           <button
@@ -1393,40 +1472,77 @@ export function AdminPanel() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button 
-                            type="button"
-                            onClick={() => moveProduct(p, 'up')} 
-                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-gray-300 active:text-white border border-white/10"
-                            title="Yukarı Taşı"
-                          >
-                            <ArrowUp size={13} />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => moveProduct(p, 'down')} 
-                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-gray-300 active:text-white border border-white/10"
-                            title="Aşağı Taşı"
-                          >
-                            <ArrowDown size={13} />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => startEdit(p)} 
-                            className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-white border border-white/5"
-                            title="Düzenle"
-                          >
-                            <Edit2 size={13} />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setIsDeleting(p.id)} 
-                            className="w-8 h-8 flex items-center justify-center bg-red-400/10 rounded-lg text-red-400 border border-red-400/10"
-                            title="Sil"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
+                        {(() => {
+                          const categorySiblings = products
+                            .filter((item) => item.category === p.category)
+                            .sort((a, b) => getProductRank(a) - getProductRank(b));
+                          const pIndex = categorySiblings.findIndex((item) => item.id === p.id);
+                          const posNum = pIndex !== -1 ? pIndex + 1 : 1;
+                          const isFirst = pIndex <= 0;
+                          const isLast = pIndex >= categorySiblings.length - 1;
+
+                          return (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button 
+                                type="button"
+                                onClick={() => moveProduct(p, 'up')} 
+                                disabled={isFirst}
+                                className="w-8 h-8 flex items-center justify-center bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg text-gray-300 active:text-white border border-white/10 cursor-pointer"
+                                title="Yukarı Taşı"
+                              >
+                                <ArrowUp size={13} />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => moveProduct(p, 'down')} 
+                                disabled={isLast}
+                                className="w-8 h-8 flex items-center justify-center bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg text-gray-300 active:text-white border border-white/10 cursor-pointer"
+                                title="Aşağı Taşı"
+                              >
+                                <ArrowDown size={13} />
+                              </button>
+                              <div className="flex items-center gap-0.5 bg-black/50 border border-white/10 rounded-lg px-1.5 py-1">
+                                <span className="text-[9px] font-bold text-gray-500">#</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={categorySiblings.length}
+                                  defaultValue={posNum}
+                                  key={`${p.id}-mpos-${posNum}`}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    const val = Number((e.target as HTMLInputElement).value);
+                                    if (!isNaN(val) && val !== posNum) {
+                                      quickUpdatePosition(p, val);
+                                    }
+                                  }}
+                                  className="w-7 bg-transparent text-center text-xs font-black text-bamm-yellow focus:outline-none"
+                                  title="Sıra Numarasını Girin"
+                                />
+                              </div>
+                              <button 
+                                type="button"
+                                onClick={() => startEdit(p)} 
+                                className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-white border border-white/5 cursor-pointer"
+                                title="Düzenle"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => setIsDeleting(p.id)} 
+                                className="w-8 h-8 flex items-center justify-center bg-red-400/10 rounded-lg text-red-400 border border-red-400/10 cursor-pointer"
+                                title="Sil"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          );
+                        })()}
                      </div>
 
                      {/* Hızlı Stok Tükendi Toggle Butonu (Mobil) */}
