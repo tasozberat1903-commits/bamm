@@ -1442,7 +1442,7 @@ export const MENU_DATA: MenuItem[] = [
   {
     id: "camp_piz_1",
     name: "1+1 PİZZA KAMPANYA",
-    description: "SADECE PAZARTESİ GÜNLERİ SAAT 19.00'A KADAR TÜM PİZZALARDA 1 ALANA 1 BEDAVA",
+    description: "CUMARTESİ HARİÇ HER GÜN SAAT 19.00'A KADAR TÜM PİZZALARDA 1 ALANA 1 BEDAVA",
     price: "1₺",
     category: "Kampanyalar",
     subcategory: "1+1",
@@ -2445,7 +2445,7 @@ export const CAMPAIGNS: Campaign[] = [
   {
     id: "c3",
     title: "1+1 Pizza",
-    description: "Sadece Pazartesi günleri saat 19.00'a kadar tüm pizzalarda bir alana bir bedava!",
+    description: "Cumartesi hariç her gün saat 19.00'a kadar tüm pizzalarda bir alana bir bedava!",
     image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=800",
     category: "Yemekler"
   }
