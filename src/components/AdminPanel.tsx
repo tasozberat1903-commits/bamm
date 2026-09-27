@@ -14,6 +14,7 @@ import {
   getDocs,
   addDoc,
   setDoc,
+  writeBatch,
   doc,
   deleteDoc,
 } from "firebase/firestore";
@@ -454,6 +455,7 @@ export function AdminPanel() {
   };
 
   const [isReordering, setIsReordering] = useState(false);
+  const [orderSaveState, setOrderSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const handleSave = async () => {
     try {
@@ -749,7 +751,34 @@ export function AdminPanel() {
     return getCategorySiblingDefaultRank(item);
   };
 
+  const persistCategoryOrder = async (orderedProducts: MenuItem[], previousProducts: MenuItem[]) => {
+    setOrderSaveState("saving");
+
+    // Only write the order field. This keeps a reorder from accidentally
+    // overwriting edits made to price, image, stock, or description.
+    const batch = writeBatch(db);
+    orderedProducts.forEach((item, index) => {
+      batch.set(doc(db, "products", item.id), { order: (index + 1) * 10 }, { merge: true });
+    });
+
+    try {
+      await batch.commit();
+      clearMenuCaches();
+      setOrderSaveState("saved");
+      window.setTimeout(() => setOrderSaveState("idle"), 1600);
+    } catch (e: any) {
+      setProducts(previousProducts);
+      setOrderSaveState("error");
+      handleFirestoreError(e, OperationType.WRITE, "products/order", false);
+      window.setTimeout(() => setOrderSaveState("idle"), 3000);
+    }
+  };
+
   const moveProduct = async (product: MenuItem, direction: 'up' | 'down') => {
+    // Ordering is intentionally category-wide. A subcategory filter hides
+    // siblings, so changing order while it is active would feel random.
+    if (selectedSubcategoryFilter !== "Tümü") return;
+
     const categoryProducts = products
       .filter((p) => p.category === product.category)
       .sort((a, b) => getProductRank(a) - getProductRank(b));
@@ -765,10 +794,9 @@ export function AdminPanel() {
     swapped[currentIndex] = swapped[targetIndex];
     swapped[targetIndex] = temp;
 
+    const previousProducts = products;
     const updatedOrders = new Map<string, number>();
-    swapped.forEach((item, idx) => {
-      updatedOrders.set(item.id, (idx + 1) * 10);
-    });
+    swapped.forEach((item, idx) => updatedOrders.set(item.id, (idx + 1) * 10));
 
     setProducts((prev) =>
       prev.map((item) => {
@@ -779,88 +807,7 @@ export function AdminPanel() {
       })
     );
 
-    try {
-      const writes = swapped.map((item, idx) => {
-        const newOrd = (idx + 1) * 10;
-        const itemData: any = {
-          name: item.name,
-          price: item.price,
-          category: item.category,
-          order: newOrd,
-          deleted: false
-        };
-        if (item.description) itemData.description = item.description;
-        if (item.subcategory) itemData.subcategory = item.subcategory;
-        if (item.image) itemData.image = item.image;
-        if (item.isPopular !== undefined) itemData.isPopular = item.isPopular;
-        if (item.isSoldOut !== undefined) itemData.isSoldOut = item.isSoldOut;
-
-        return setDoc(doc(db, "products", item.id), itemData, { merge: true });
-      });
-      await Promise.all(writes);
-      clearMenuCaches();
-    } catch (e: any) {
-      console.warn("Sıralama kaydetme hatası:", e);
-      handleFirestoreError(e, OperationType.WRITE, `products/${product.id}`, false);
-    }
-  };
-
-  const quickUpdatePosition = async (product: MenuItem, targetPos: number) => {
-    if (isNaN(targetPos) || targetPos < 1) return;
-
-    const categoryProducts = products
-      .filter((p) => p.category === product.category)
-      .sort((a, b) => getProductRank(a) - getProductRank(b));
-
-    const currentIdx = categoryProducts.findIndex((p) => p.id === product.id);
-    if (currentIdx === -1) return;
-
-    const currentPos = currentIdx + 1;
-    if (currentPos === targetPos) return;
-
-    const listWithoutItem = categoryProducts.filter((p) => p.id !== product.id);
-    const insertIdx = Math.max(0, Math.min(targetPos - 1, listWithoutItem.length));
-    listWithoutItem.splice(insertIdx, 0, product);
-
-    const reorderedList = listWithoutItem;
-    const updatedOrders = new Map<string, number>();
-    reorderedList.forEach((item, idx) => {
-      updatedOrders.set(item.id, (idx + 1) * 10);
-    });
-
-    setProducts((prev) =>
-      prev.map((item) => {
-        if (updatedOrders.has(item.id)) {
-          return { ...item, order: updatedOrders.get(item.id) };
-        }
-        return item;
-      })
-    );
-
-    try {
-      const writes = reorderedList.map((item, idx) => {
-        const newOrd = (idx + 1) * 10;
-        const itemData: any = {
-          name: item.name,
-          price: item.price,
-          category: item.category,
-          order: newOrd,
-          deleted: false
-        };
-        if (item.description) itemData.description = item.description;
-        if (item.subcategory) itemData.subcategory = item.subcategory;
-        if (item.image) itemData.image = item.image;
-        if (item.isPopular !== undefined) itemData.isPopular = item.isPopular;
-        if (item.isSoldOut !== undefined) itemData.isSoldOut = item.isSoldOut;
-
-        return setDoc(doc(db, "products", item.id), itemData, { merge: true });
-      });
-      await Promise.all(writes);
-      clearMenuCaches();
-    } catch (e: any) {
-      console.warn("Sıra güncelleme hatası:", e);
-      handleFirestoreError(e, OperationType.WRITE, `products/${product.id}`, false);
-    }
+    await persistCategoryOrder(swapped, previousProducts);
   };
 
   const startEdit = (p: MenuItem) => {
@@ -1240,6 +1187,13 @@ export function AdminPanel() {
                       <span>{isReordering ? "Kaydediliyor..." : "Sıralamayı Eşitle"}</span>
                     </button>
                   )}
+                  {orderSaveState !== "idle" && (
+                    <span className={`text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
+                      orderSaveState === "error" ? "text-red-400" : orderSaveState === "saved" ? "text-emerald-400" : "text-bamm-yellow"
+                    }`}>
+                      {orderSaveState === "saving" ? "Sıra kaydediliyor..." : orderSaveState === "saved" ? "Sıra canlıya aktarıldı" : "Sıra kaydedilemedi"}
+                    </span>
+                  )}
                   <div className="relative w-full md:w-64">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={14} />
                     <input
@@ -1351,44 +1305,24 @@ export function AdminPanel() {
                                 <button
                                   type="button"
                                   onClick={() => moveProduct(p, 'up')}
-                                  disabled={isFirst}
+                                  disabled={isFirst || orderSaveState === "saving" || selectedSubcategoryFilter !== "Tümü"}
                                   className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/15 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg text-gray-300 hover:text-white transition-all border border-white/10 cursor-pointer"
-                                  title={isFirst ? "Zaten En Üstte" : "Yukarı Taşı"}
+                                  title={selectedSubcategoryFilter !== "Tümü" ? "Alt kategori filtresini kaldırın" : isFirst ? "Zaten En Üstte" : "Yukarı Taşı"}
                                 >
                                   <ArrowUp size={13} />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => moveProduct(p, 'down')}
-                                  disabled={isLast}
+                                  disabled={isLast || orderSaveState === "saving" || selectedSubcategoryFilter !== "Tümü"}
                                   className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/15 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg text-gray-300 hover:text-white transition-all border border-white/10 cursor-pointer"
-                                  title={isLast ? "Zaten En Altta" : "Aşağı Taşı"}
+                                  title={selectedSubcategoryFilter !== "Tümü" ? "Alt kategori filtresini kaldırın" : isLast ? "Zaten En Altta" : "Aşağı Taşı"}
                                 >
                                   <ArrowDown size={13} />
                                 </button>
-                                <div className="flex items-center gap-1 bg-black/50 border border-white/10 hover:border-white/30 focus-within:border-bamm-yellow rounded-lg px-2 py-1">
-                                  <span className="text-[10px] font-bold text-gray-500">Sıra:</span>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    max={categorySiblings.length}
-                                    defaultValue={posNum}
-                                    key={`${p.id}-pos-${posNum}`}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        (e.target as HTMLInputElement).blur();
-                                      }
-                                    }}
-                                    onBlur={(e) => {
-                                      const val = Number((e.target as HTMLInputElement).value);
-                                      if (!isNaN(val) && val !== posNum) {
-                                        quickUpdatePosition(p, val);
-                                      }
-                                    }}
-                                    className="w-10 bg-transparent text-center text-xs font-black text-bamm-yellow focus:outline-none"
-                                    title="Sıra Numarasını Girin (örneğin: 1, 2, 3...)"
-                                  />
-                                </div>
+                                <span className="min-w-6 text-center text-[10px] font-black text-gray-500" title="Kategori içindeki sıra">
+                                  {posNum}
+                                </span>
                               </div>
                             );
                           })()}
@@ -1486,44 +1420,24 @@ export function AdminPanel() {
                               <button 
                                 type="button"
                                 onClick={() => moveProduct(p, 'up')} 
-                                disabled={isFirst}
+                                 disabled={isFirst || orderSaveState === "saving" || selectedSubcategoryFilter !== "Tümü"}
                                 className="w-8 h-8 flex items-center justify-center bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg text-gray-300 active:text-white border border-white/10 cursor-pointer"
-                                title="Yukarı Taşı"
+                                 title={selectedSubcategoryFilter !== "Tümü" ? "Alt kategori filtresini kaldırın" : "Yukarı Taşı"}
                               >
                                 <ArrowUp size={13} />
                               </button>
                               <button 
                                 type="button"
                                 onClick={() => moveProduct(p, 'down')} 
-                                disabled={isLast}
+                                 disabled={isLast || orderSaveState === "saving" || selectedSubcategoryFilter !== "Tümü"}
                                 className="w-8 h-8 flex items-center justify-center bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg text-gray-300 active:text-white border border-white/10 cursor-pointer"
-                                title="Aşağı Taşı"
+                                 title={selectedSubcategoryFilter !== "Tümü" ? "Alt kategori filtresini kaldırın" : "Aşağı Taşı"}
                               >
                                 <ArrowDown size={13} />
                               </button>
-                              <div className="flex items-center gap-0.5 bg-black/50 border border-white/10 rounded-lg px-1.5 py-1">
-                                <span className="text-[9px] font-bold text-gray-500">#</span>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={categorySiblings.length}
-                                  defaultValue={posNum}
-                                  key={`${p.id}-mpos-${posNum}`}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      (e.target as HTMLInputElement).blur();
-                                    }
-                                  }}
-                                  onBlur={(e) => {
-                                    const val = Number((e.target as HTMLInputElement).value);
-                                    if (!isNaN(val) && val !== posNum) {
-                                      quickUpdatePosition(p, val);
-                                    }
-                                  }}
-                                  className="w-7 bg-transparent text-center text-xs font-black text-bamm-yellow focus:outline-none"
-                                  title="Sıra Numarasını Girin"
-                                />
-                              </div>
+                               <span className="min-w-5 text-center text-[9px] font-black text-gray-500" title="Kategori içindeki sıra">
+                                 {posNum}
+                               </span>
                               <button 
                                 type="button"
                                 onClick={() => startEdit(p)} 
