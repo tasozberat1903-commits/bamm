@@ -683,18 +683,30 @@ export function HomeSection({
           >
             {HEROSLIDES.map((slide, idx) => (
               <div key={slide.id} className="min-w-full h-full relative snap-start shrink-0 group overflow-hidden">
+                {slide.imageFit === "contain" && (
+                  <div
+                    className="absolute inset-0 scale-110 bg-center bg-cover blur-0 opacity-60 saturate-125"
+                    style={{ backgroundImage: `url(${slide.image})` }}
+                    aria-hidden="true"
+                  />
+                )}
                 <img
                   src={slide.image}
-                  alt={slide.title}
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                  alt={slide.isNew ? "Yeni kampanya: Uludağ Üniversitesi öğrencilerine hafta içi yüzde 30 indirim" : slide.title}
+                  className={`absolute inset-0 w-full h-full transition-transform duration-1000 group-hover:scale-105 ${slide.imageFit === "contain" ? "object-contain object-right bg-[#f7d8dc] px-2" : "object-cover"}`}
                   referrerPolicy="no-referrer"
                 />
                 {/* Gradient for text contrast */}
-                <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
+                <div className={`absolute inset-0 ${slide.imageFit === "cover" ? "bg-gradient-to-r from-black/95 via-black/70 to-transparent" : "bg-gradient-to-r from-black/90 via-black/50 to-transparent"}`} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
                 
                 <div className="absolute inset-0 p-8 flex flex-col justify-end">
                   <div className="mb-auto mt-8">
+                    {slide.badge && (
+                      <span className="inline-flex items-center rounded-full bg-bamm-yellow px-3 py-1.5 mb-4 text-[10px] font-black uppercase tracking-[0.18em] text-bamm-black shadow-[0_0_18px_rgba(250,204,21,0.28)]">
+                        {slide.badge}
+                      </span>
+                    )}
                     <span className="text-white font-bold tracking-[0.3em] text-[13px] block mb-2 drop-shadow-md">
                       {slide.subtitle}
                     </span>
@@ -735,12 +747,14 @@ export function HomeSection({
             <>
               <button 
                 onClick={() => scrollHero('left')}
+                aria-label="Önceki kampanya görseli"
                 className={`absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white transition-all z-20 md:flex hidden hover:bg-black/50 ${activeHeroIndex === 0 ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}
               >
                 <ChevronLeft size={24} />
               </button>
               <button 
                 onClick={() => scrollHero('right')}
+                aria-label="Sonraki kampanya görseli"
                 className={`absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white transition-all z-20 md:flex hidden hover:bg-black/50 ${activeHeroIndex === HEROSLIDES.length - 1 ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}
               >
                 <ChevronRight size={24} />
@@ -828,10 +842,10 @@ export function HomeSection({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
                 <div className="absolute inset-0 p-6 flex flex-col justify-end">
-                  {i === 0 && (
-                    <div className="bg-white/10 backdrop-blur-md w-fit px-2.5 py-1 rounded-md mb-4 border border-white/10 shrink-0">
-                      <span className="text-[9px] font-black text-white uppercase tracking-widest">
-                        ÖNE ÇIKAN
+                  {campaign.badge && (
+                    <div className={`backdrop-blur-md w-fit px-2.5 py-1 rounded-md mb-4 border shrink-0 ${campaign.isNew ? "bg-bamm-yellow border-bamm-yellow text-bamm-black" : "bg-white/10 border-white/10 text-white"}`}>
+                      <span className="text-[9px] font-black uppercase tracking-widest">
+                        {campaign.badge}
                       </span>
                     </div>
                   )}
@@ -1842,8 +1856,8 @@ export function CampaignsSection() {
             className="bg-gradient-to-br from-bamm-anthracite to-bamm-black border border-bamm-yellow/20 rounded-3xl overflow-hidden relative group"
           >
             <div className="p-6 relative z-10">
-              <span className="bg-bamm-yellow text-bamm-black px-3 py-1 rounded-full text-[10px] font-black uppercase mb-4 inline-block">
-                Fırsat Paneli
+              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase mb-4 inline-block ${campaign.isNew ? "bg-bamm-yellow text-bamm-black" : "bg-white/10 text-white border border-white/10"}`}>
+                {campaign.badge ?? "Fırsat Paneli"}
               </span>
               <h3 className="text-lg font-bold mb-2 group-hover:text-bamm-yellow transition-colors">
                 {campaign.title}

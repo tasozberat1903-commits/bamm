@@ -19,6 +19,8 @@ export interface Campaign {
   description: string;
   image?: string;
   category?: string;
+  badge?: string;
+  isNew?: boolean;
 }
 
 export interface Event {
@@ -38,6 +40,9 @@ export interface HeroSlide {
   description: string;
   image: string;
   buttonText: string;
+  badge?: string;
+  isNew?: boolean;
+  imageFit?: "cover" | "contain";
 }
 
 export const CATEGORIES = [
@@ -2429,11 +2434,21 @@ export const MENU_DATA: MenuItem[] = [
 
 export const CAMPAIGNS: Campaign[] = [
   {
+    id: "c0",
+    title: "Öğrenci %30 İndirim",
+    description: "Uludağ Üniversitesi öğrencilerine hafta içi tüm menüde %30 indirim.",
+    image: "/kampanya-ogrenci-indirimi.jpg",
+    category: "Kampanyalar",
+    badge: "YENİ KAMPANYA",
+    isNew: true,
+  },
+  {
     id: "c1",
     title: "Happy Hour",
     description: "HAFTANIN HERGÜNÜ CUMARTESİ HARİÇ TUBORG ŞİŞE SAAT 19:00 'A KADAR 150 TL",
     image: "https://images.pexels.com/photos/159291/beer-machine-alcohol-brewery-159291.jpeg?auto=compress&cs=tinysrgb&w=800",
-    category: "Biralar"
+    category: "Biralar",
+    badge: "ÖNE ÇIKAN",
   },
   {
     id: "c2",
@@ -2452,6 +2467,18 @@ export const CAMPAIGNS: Campaign[] = [
 ];
 
 export const HEROSLIDES: HeroSlide[] = [
+  {
+    id: "h0",
+    subtitle: "ÖĞRENCİLER İÇİN",
+    title: "HAFTA İÇİ",
+    highlight: "%30 İNDİRİM!",
+    description: "Uludağ Üniversitesi öğrencilerine özel. Cuma ve cumartesi günleri geçerli değildir.",
+    image: "/kampanya-ogrenci-indirimi.jpg",
+    buttonText: "MENÜYE GİT",
+    badge: "YENİ KAMPANYA",
+    isNew: true,
+    imageFit: "cover",
+  },
   {
     id: "h1",
     subtitle: "LEZZETİN",

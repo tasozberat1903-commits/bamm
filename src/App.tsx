@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, X } from "lucide-react";
 import BottomNav from "./components/BottomNav";
 import {
   Header,
@@ -26,6 +26,8 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isCampaignPopupOpen, setIsCampaignPopupOpen] = useState(true);
+  const campaignCloseRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
 
   const scrollToTop = () => {
@@ -58,6 +60,26 @@ export default function App() {
     window.addEventListener('hashchange', checkHash);
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
+
+  useEffect(() => {
+    if (!isCampaignPopupOpen || activeTab !== "home") return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsCampaignPopupOpen(false);
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    campaignCloseRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isCampaignPopupOpen, activeTab]);
 
   const renderSection = () => {
     switch (activeTab) {
@@ -234,6 +256,60 @@ export default function App() {
               isOpen={isFeedbackOpen}
               onClose={() => setIsFeedbackOpen(false)}
             />
+
+            <AnimatePresence>
+              {isCampaignPopupOpen && activeTab === "home" && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 p-3 backdrop-blur-md sm:p-6"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="campaign-popup-title"
+                  onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) {
+                      setIsCampaignPopupOpen(false);
+                    }
+                  }}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.94, y: 14 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 10 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                    className="relative flex max-h-[calc(100dvh-4rem)] w-fit max-w-[min(92vw,420px)] flex-col overflow-hidden rounded-[24px] border border-white/15 bg-[#111111] shadow-[0_24px_80px_rgba(0,0,0,0.6)] sm:max-h-[calc(100dvh-6rem)] sm:max-w-[440px]"
+                  >
+                    <span id="campaign-popup-title" className="sr-only">
+                      Yeni kampanya
+                    </span>
+
+                    <div className="absolute left-4 top-4 z-20 rounded-full bg-bamm-yellow px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-bamm-black shadow-lg">
+                      YENİ KAMPANYA
+                    </div>
+
+                    <button
+                      ref={campaignCloseRef}
+                      type="button"
+                      onClick={() => setIsCampaignPopupOpen(false)}
+                      aria-label="Kampanya popup'ını kapat"
+                      className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur-md transition-colors hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-bamm-yellow"
+                    >
+                      <X size={20} strokeWidth={2.5} />
+                    </button>
+
+                    <div className="flex min-h-0 flex-1 justify-center overflow-auto bg-[#111111]">
+                      <img
+                        src="/kampanya-ogrenci-indirimi.jpg"
+                        alt="Uludağ Üniversitesi öğrencilerine hafta içi yüzde 30 indirim kampanyası"
+                        className="block h-auto max-h-[58vh] w-auto max-w-full object-contain sm:max-h-[62vh]"
+                      />
+                    </div>
+
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </>
         )}
       </AnimatePresence>
