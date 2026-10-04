@@ -21,6 +21,9 @@ export interface Campaign {
   category?: string;
   badge?: string;
   isNew?: boolean;
+  isActive?: boolean;
+  deleted?: boolean;
+  order?: number;
 }
 
 export interface Event {

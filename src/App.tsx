@@ -14,7 +14,9 @@ import {
   FeedbackModal,
 } from "./components/Sections";
 import { AdminPanel } from "./components/AdminPanel";
-import { MenuItem } from "./data";
+import { CAMPAIGNS, Campaign, MenuItem } from "./data";
+import { db } from "./lib/firebase";
+import { collection, doc, onSnapshot } from "firebase/firestore";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
@@ -27,6 +29,8 @@ export default function App() {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isCampaignPopupOpen, setIsCampaignPopupOpen] = useState(true);
+  const [campaignPopupEnabled, setCampaignPopupEnabled] = useState(true);
+  const [publicCampaigns, setPublicCampaigns] = useState<Campaign[]>(CAMPAIGNS.map((campaign, index) => ({ ...campaign, order: index * 10, isActive: true })));
   const campaignCloseRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
 
@@ -48,6 +52,44 @@ export default function App() {
       setIsLoading(false);
     }, 1500);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const fallbackCampaigns = CAMPAIGNS.map((campaign, index) => ({ ...campaign, order: index * 10, isActive: true }));
+    const sortCampaigns = (items: Campaign[]) => [...items]
+      .filter((campaign) => !campaign.deleted && campaign.isActive !== false)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    let campaignsUnsubscribe: (() => void) | undefined;
+    let settingsUnsubscribe: (() => void) | undefined;
+    try {
+      campaignsUnsubscribe = onSnapshot(collection(db, "campaigns"), (snapshot) => {
+        if (snapshot.empty) {
+          setPublicCampaigns(sortCampaigns(fallbackCampaigns));
+          return;
+        }
+        const rows = snapshot.docs.map((campaignDoc) => ({
+          id: campaignDoc.id,
+          ...campaignDoc.data(),
+        })) as Campaign[];
+        setPublicCampaigns(sortCampaigns(rows));
+      }, () => {
+        setPublicCampaigns(sortCampaigns(fallbackCampaigns));
+      });
+
+      settingsUnsubscribe = onSnapshot(doc(db, "settings", "campaigns"), (snapshot) => {
+        setCampaignPopupEnabled(snapshot.exists() ? snapshot.data()?.popupEnabled !== false : true);
+      }, () => {
+        setCampaignPopupEnabled(true);
+      });
+    } catch (error) {
+      console.warn("Kampanya ayarları yüklenemedi:", error);
+    }
+
+    return () => {
+      campaignsUnsubscribe?.();
+      settingsUnsubscribe?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -80,6 +122,8 @@ export default function App() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isCampaignPopupOpen, activeTab]);
+
+  const popupCampaign = publicCampaigns[0];
 
   const renderSection = () => {
     switch (activeTab) {
@@ -258,7 +302,7 @@ export default function App() {
             />
 
             <AnimatePresence>
-              {isCampaignPopupOpen && activeTab === "home" && (
+              {isCampaignPopupOpen && campaignPopupEnabled && activeTab === "home" && popupCampaign && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -285,7 +329,7 @@ export default function App() {
                     </span>
 
                     <div className="absolute left-4 top-4 z-20 rounded-full bg-bamm-yellow px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-bamm-black shadow-lg">
-                      YENİ KAMPANYA
+                        {popupCampaign.badge || "YENİ KAMPANYA"}
                     </div>
 
                     <button
@@ -300,8 +344,8 @@ export default function App() {
 
                     <div className="flex min-h-0 flex-1 justify-center overflow-auto bg-[#111111]">
                       <img
-                        src="/kampanya-ogrenci-indirimi.jpg"
-                        alt="Uludağ Üniversitesi öğrencilerine hafta içi yüzde 30 indirim kampanyası"
+                        src={popupCampaign.image || "/kampanya-ogrenci-indirimi.jpg"}
+                        alt={popupCampaign.title}
                         className="block h-auto max-h-[58vh] w-auto max-w-full object-contain sm:max-h-[62vh]"
                       />
                     </div>

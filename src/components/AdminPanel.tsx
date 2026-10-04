@@ -17,8 +17,9 @@ import {
   writeBatch,
   doc,
   deleteDoc,
+  serverTimestamp,
 } from "firebase/firestore";
-import { CATEGORIES, MENU_DATA, MenuItem, normalizeTurkish } from "../data";
+import { CATEGORIES, MENU_DATA, MenuItem, Campaign, CAMPAIGNS, normalizeTurkish } from "../data";
 import { 
   LogOut, 
   Plus, 
@@ -48,6 +49,8 @@ import {
   Clock,
   Filter,
   Check,
+  BadgePercent,
+  Megaphone,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -161,7 +164,7 @@ export function AdminPanel() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [nfcStatus, setNfcStatus] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"products" | "categories" | "feedback" | "settings">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "campaigns" | "categories" | "feedback" | "settings">("products");
   const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string; image?: string; deleted?: boolean }[]>([]);
   const [editingCategory, setEditingCategory] = useState<{ id: string | null; name: string; description: string; order: number; image?: string } | null>(null);
   const [categoryImageSourceTab, setCategoryImageSourceTab] = useState<"upload" | "url">("upload");
@@ -173,12 +176,25 @@ export function AdminPanel() {
   const [deletingCategory, setDeletingCategory] = useState<{ id: string; name: string } | null>(null);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
 
+  const [campaigns, setCampaigns] = useState<Campaign[]>(CAMPAIGNS.map((campaign, index) => ({ ...campaign, order: index * 10, isActive: true })));
+  const [campaignPopupEnabled, setCampaignPopupEnabled] = useState(true);
+  const [editingCampaign, setEditingCampaign] = useState<(Campaign & { id: string | null }) | null>(null);
+  const [campaignImageSourceTab, setCampaignImageSourceTab] = useState<"upload" | "url">("upload");
+  const [campaignImageUploadLoading, setCampaignImageUploadLoading] = useState(false);
+  const [campaignImageUploadError, setCampaignImageUploadError] = useState("");
+  const [campaignSaveError, setCampaignSaveError] = useState("");
+  const [campaignsLoadedFromDb, setCampaignsLoadedFromDb] = useState(false);
+
   const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
   const [selectedFeedbackFilter, setSelectedFeedbackFilter] = useState<string>("Tümü");
   const [feedbackSearch, setFeedbackSearch] = useState("");
   const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null);
 
   const availableCategories = dbCategories.length > 0 ? dbCategories.map(c => c.name) : CATEGORIES;
+
+  const sortCampaigns = (items: Campaign[]) => [...items]
+    .filter((campaign) => !campaign.deleted)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   const [showCustomSubcategoryInput, setShowCustomSubcategoryInput] = useState(false);
   const [selectedSubcategoryFilter, setSelectedSubcategoryFilter] = useState<string>("Tümü");
@@ -274,6 +290,60 @@ export function AdminPanel() {
           console.warn("Error in products unsubscribe cleanup in AdminPanel: ", e);
         }
       }
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let unsubCampaigns: (() => void) | undefined;
+    let unsubSettings: (() => void) | undefined;
+    let isSeedingCampaigns = false;
+    const defaults = CAMPAIGNS.map((campaign, index) => ({
+      ...campaign,
+      order: index * 10,
+      isActive: true,
+      deleted: false,
+    }));
+
+    try {
+      unsubCampaigns = onSnapshot(collection(db, "campaigns"), (snap) => {
+        if (!snap.empty) {
+          const rows = snap.docs.map((campaignDoc) => ({
+            id: campaignDoc.id,
+            ...campaignDoc.data(),
+          })) as Campaign[];
+          setCampaigns(sortCampaigns(rows));
+          setCampaignsLoadedFromDb(true);
+        } else if (!isSeedingCampaigns) {
+          isSeedingCampaigns = true;
+          setCampaigns(defaults);
+          Promise.all(defaults.map((campaign) =>
+            setDoc(doc(db, "campaigns", campaign.id), campaign, { merge: true })
+          )).then(() => setCampaignsLoadedFromDb(true)).catch((error) => {
+            console.warn("Varsayılan kampanyalar yüklenemedi:", error);
+            setCampaignsLoadedFromDb(true);
+          });
+        }
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, "campaigns", false);
+        setCampaigns(defaults);
+        setCampaignsLoadedFromDb(true);
+      });
+
+      unsubSettings = onSnapshot(doc(db, "settings", "campaigns"), (settingsDoc) => {
+        setCampaignPopupEnabled(settingsDoc.exists() ? settingsDoc.data()?.popupEnabled !== false : true);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, "settings/campaigns", false);
+      });
+    } catch (error) {
+      console.warn("Kampanya yönetimi başlatılamadı:", error);
+      setCampaigns(defaults);
+      setCampaignsLoadedFromDb(true);
+    }
+
+    return () => {
+      unsubCampaigns?.();
+      unsubSettings?.();
     };
   }, [user]);
 
@@ -863,6 +933,139 @@ export function AdminPanel() {
     setCategorySaveError("");
   };
 
+  const startNewCampaign = () => {
+    setEditingCampaign({
+      id: null,
+      title: "",
+      description: "",
+      image: "",
+      category: "Kampanyalar",
+      badge: "YENİ KAMPANYA",
+      isNew: true,
+      isActive: true,
+      order: campaigns.length * 10,
+    });
+    setCampaignImageSourceTab("upload");
+    setCampaignImageUploadError("");
+    setCampaignSaveError("");
+  };
+
+  const startEditCampaign = (campaign: Campaign) => {
+    setEditingCampaign({
+      ...campaign,
+      id: campaign.id,
+      title: campaign.title || "",
+      description: campaign.description || "",
+      image: campaign.image || "",
+      category: campaign.category || "Kampanyalar",
+      badge: campaign.badge || "KAMPANYA",
+      isNew: campaign.isNew ?? false,
+      isActive: campaign.isActive !== false,
+      order: campaign.order ?? 0,
+    });
+    setCampaignImageSourceTab(campaign.image?.startsWith("data:") ? "upload" : "url");
+    setCampaignImageUploadError("");
+    setCampaignSaveError("");
+  };
+
+  const handleCampaignImageUpload = async (file?: File) => {
+    if (!file) return;
+    try {
+      setCampaignImageUploadLoading(true);
+      setCampaignImageUploadError("");
+      const compressed = await compressImage(file);
+      setEditingCampaign((current) => current ? { ...current, image: compressed } : current);
+    } catch (error) {
+      console.warn("Kampanya görseli yüklenemedi:", error);
+      setCampaignImageUploadError("Görsel işlenemedi. Farklı bir görsel deneyin.");
+    } finally {
+      setCampaignImageUploadLoading(false);
+    }
+  };
+
+  const saveCampaign = async () => {
+    if (!editingCampaign) return;
+    if (!editingCampaign.title.trim()) {
+      setCampaignSaveError("Kampanya başlığı zorunludur.");
+      return;
+    }
+
+    const id = editingCampaign.id || normalizeTurkish(editingCampaign.title).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `campaign-${Date.now()}`;
+    const campaignData: Campaign = {
+      id,
+      title: editingCampaign.title.trim(),
+      description: editingCampaign.description.trim(),
+      image: editingCampaign.image || "",
+      category: editingCampaign.category?.trim() || "Kampanyalar",
+      badge: editingCampaign.badge?.trim() || "KAMPANYA",
+      isNew: Boolean(editingCampaign.isNew),
+      isActive: editingCampaign.isActive !== false,
+      order: editingCampaign.order ?? campaigns.length * 10,
+      deleted: false,
+    };
+
+    try {
+      setCampaignSaveError("");
+      await setDoc(doc(db, "campaigns", id), { ...campaignData, updatedAt: serverTimestamp() }, { merge: true });
+      setCampaigns((current) => sortCampaigns([...current.filter((item) => item.id !== id), campaignData]));
+      setEditingCampaign(null);
+    } catch (error: any) {
+      console.warn("Kampanya kaydetme hatası:", error);
+      setCampaignSaveError(error?.message || "Kampanya kaydedilemedi.");
+    }
+  };
+
+  const moveCampaign = async (index: number, direction: "up" | "down") => {
+    const ordered = sortCampaigns(campaigns);
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= ordered.length) return;
+
+    const reordered = [...ordered];
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    const batch = writeBatch(db);
+    reordered.forEach((campaign, campaignIndex) => {
+      batch.set(doc(db, "campaigns", campaign.id), { order: campaignIndex * 10, deleted: false }, { merge: true });
+    });
+
+    try {
+      await batch.commit();
+      setCampaigns(reordered.map((campaign, campaignIndex) => ({ ...campaign, order: campaignIndex * 10 })));
+    } catch (error) {
+      console.warn("Kampanya sıralaması kaydedilemedi:", error);
+      handleFirestoreError(error, OperationType.WRITE, "campaigns/order", false);
+    }
+  };
+
+  const toggleCampaignActive = async (campaign: Campaign) => {
+    const isActive = campaign.isActive === false;
+    setCampaigns((current) => current.map((item) => item.id === campaign.id ? { ...item, isActive } : item));
+    try {
+      await setDoc(doc(db, "campaigns", campaign.id), { isActive, deleted: false }, { merge: true });
+    } catch (error) {
+      console.warn("Kampanya durumu kaydedilemedi:", error);
+    }
+  };
+
+  const deleteCampaign = async (campaign: Campaign) => {
+    setCampaigns((current) => current.filter((item) => item.id !== campaign.id));
+    try {
+      await setDoc(doc(db, "campaigns", campaign.id), { deleted: true, isActive: false, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (error) {
+      console.warn("Kampanya silinemedi:", error);
+    }
+  };
+
+  const toggleCampaignPopup = async () => {
+    const nextValue = !campaignPopupEnabled;
+    setCampaignPopupEnabled(nextValue);
+    try {
+      await setDoc(doc(db, "settings", "campaigns"), { popupEnabled: nextValue, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (error) {
+      console.warn("Kampanya popup ayarı kaydedilemedi:", error);
+      setCampaignPopupEnabled(!nextValue);
+    }
+  };
+
   const startEditCategory = (cat: any) => {
     setEditingCategory({
       id: cat.id,
@@ -1008,6 +1211,7 @@ export function AdminPanel() {
         <nav className="flex-1 px-4 space-y-2">
           {[
             { id: "products", icon: Utensils, label: "Ürünler" },
+            { id: "campaigns", icon: BadgePercent, label: "Kampanyalar" },
             { id: "categories", icon: FolderOpen, label: "Kategoriler" },
             { id: "feedback", icon: MessageSquare, label: "Geri Bildirim", badge: unreadFeedbackCount },
             { id: "settings", icon: Settings, label: "Sistem" },
@@ -1055,6 +1259,7 @@ export function AdminPanel() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#121418] border-t border-white/5 px-4 pt-3 pb-[calc(1.2rem+env(safe-area-inset-bottom))] flex items-center justify-around shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         {[
           { id: "products", icon: Utensils, label: "Ürünler" },
+          { id: "campaigns", icon: BadgePercent, label: "Kampanya" },
           { id: "categories", icon: FolderOpen, label: "Kategori" },
           { id: "feedback", icon: MessageSquare, label: "Bildirim", badge: unreadFeedbackCount },
           { id: "settings", icon: Settings, label: "Ayarlar" },
@@ -1486,6 +1691,102 @@ export function AdminPanel() {
                      </div>
                    </div>
                  ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "campaigns" && (
+          <div className="p-4 md:p-12 max-w-6xl">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 md:mb-10">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-2xl bg-bamm-yellow/10 border border-bamm-yellow/20 flex items-center justify-center text-bamm-yellow">
+                    <Megaphone size={20} />
+                  </div>
+                  <h1 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter italic">Kampanya Yönetimi</h1>
+                </div>
+                <p className="text-gray-500 text-xs md:text-sm">Kampanyaları düzenleyin, görünürlüğünü ve menüdeki sırasını yönetin.</p>
+              </div>
+              <button
+                onClick={startNewCampaign}
+                className="bg-bamm-yellow text-black px-6 md:px-8 py-3 md:py-4 rounded-2xl font-black uppercase text-[10px] md:text-xs flex items-center justify-center gap-2 hover:bg-yellow-400 active:scale-95 transition-all shadow-xl shadow-bamm-yellow/10 self-start md:self-auto"
+              >
+                <Plus size={18} /> Yeni Kampanya Ekle
+              </button>
+            </div>
+
+            <div className="bg-[#16191E] rounded-3xl md:rounded-[32px] border border-white/5 p-5 md:p-6 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="flex items-start gap-4">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center border ${campaignPopupEnabled ? "bg-bamm-yellow/10 border-bamm-yellow/20 text-bamm-yellow" : "bg-white/5 border-white/10 text-gray-500"}`}>
+                  {campaignPopupEnabled ? <Eye size={20} /> : <EyeOff size={20} />}
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wide text-white">Giriş popup'ı</h3>
+                  <p className="text-xs text-gray-500 mt-1">Sıralamadaki ilk aktif kampanya, menü açılışında gösterilir.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={toggleCampaignPopup}
+                aria-pressed={campaignPopupEnabled}
+                className={`min-h-11 px-4 rounded-xl border font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${campaignPopupEnabled ? "bg-bamm-yellow text-black border-bamm-yellow" : "bg-white/5 text-gray-400 border-white/10 hover:text-white"}`}
+              >
+                {campaignPopupEnabled ? <><Eye size={15} /> Açık</> : <><EyeOff size={15} /> Kapalı</>}
+              </button>
+            </div>
+
+            {!campaignsLoadedFromDb && (
+              <div className="mb-6 rounded-2xl border border-bamm-yellow/20 bg-bamm-yellow/5 px-4 py-3 text-xs text-bamm-yellow flex items-center gap-2">
+                <CheckCircle2 size={15} /> Varsayılan kampanyalar yönetim alanına aktarılıyor...
+              </div>
+            )}
+
+            <div className="bg-[#16191E] rounded-3xl md:rounded-[32px] border border-white/5 overflow-hidden shadow-2xl">
+              <div className="p-5 md:p-6 border-b border-white/5 bg-white/[0.01] flex items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-gray-300">Kampanya listesi ({campaigns.length})</h4>
+                  <p className="text-[10px] text-gray-600 mt-1">Yukarıdaki kampanya popup'ta ilk görünür.</p>
+                </div>
+                <BadgePercent size={18} className="text-bamm-yellow" />
+              </div>
+
+              <div className="divide-y divide-white/5">
+                {sortCampaigns(campaigns).map((campaign, index) => (
+                  <div key={campaign.id} className={`p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4 transition-colors ${campaign.isActive === false ? "opacity-55" : "hover:bg-white/[0.02]"}`}>
+                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden bg-black border border-white/10 shrink-0">
+                      {campaign.image ? (
+                        <img src={campaign.image} alt={campaign.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-600"><ImageIcon size={22} /></div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="text-[9px] font-black text-bamm-yellow bg-bamm-yellow/10 px-2 py-1 rounded-md tracking-wider">SIRA {index + 1}</span>
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md border ${campaign.isActive === false ? "text-gray-500 border-white/10 bg-white/5" : "text-emerald-400 border-emerald-400/20 bg-emerald-400/10"}`}>
+                          {campaign.isActive === false ? "GİZLİ" : "YAYINDA"}
+                        </span>
+                        {campaign.isNew && <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md bg-bamm-yellow text-black">YENİ</span>}
+                      </div>
+                      <h3 className="text-base md:text-lg font-black text-white uppercase tracking-tight truncate">{campaign.title}</h3>
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2 max-w-2xl">{campaign.description || "Açıklama yok"}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between md:justify-end gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => moveCampaign(index, "up")} disabled={index === 0} aria-label={`${campaign.title} kampanyasını yukarı taşı`} className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-gray-300 hover:text-white disabled:opacity-20 border border-white/10 transition-all"><ArrowUp size={14} /></button>
+                        <button type="button" onClick={() => moveCampaign(index, "down")} disabled={index === campaigns.length - 1} aria-label={`${campaign.title} kampanyasını aşağı taşı`} className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-gray-300 hover:text-white disabled:opacity-20 border border-white/10 transition-all"><ArrowDown size={14} /></button>
+                      </div>
+                      <button type="button" onClick={() => toggleCampaignActive(campaign)} aria-label={`${campaign.title} kampanyasını ${campaign.isActive === false ? "yayına al" : "gizle"}`} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${campaign.isActive === false ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/20" : "bg-white/5 text-gray-300 border-white/10 hover:text-white"}`}>
+                        {campaign.isActive === false ? <Eye size={15} /> : <EyeOff size={15} />}
+                      </button>
+                      <button type="button" onClick={() => startEditCampaign(campaign)} aria-label={`${campaign.title} kampanyasını düzenle`} className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-white border border-white/10 transition-all"><Edit2 size={14} /></button>
+                      <button type="button" onClick={() => { if (window.confirm(`${campaign.title} kampanyası gizlensin mi?`)) deleteCampaign(campaign); }} aria-label={`${campaign.title} kampanyasını sil`} className="w-10 h-10 flex items-center justify-center bg-red-400/10 hover:bg-red-400/20 rounded-xl text-red-400 border border-red-400/10 transition-all"><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -2188,6 +2489,126 @@ export function AdminPanel() {
                 >
                   Değişiklikleri Kaydet
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Campaign Edit/Add Modal */}
+      <AnimatePresence>
+        {editingCampaign && (
+          <div className="fixed inset-0 z-[100] flex justify-end">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              onClick={() => setEditingCampaign(null)}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="relative bg-[#16191E] w-full md:w-[520px] h-full shadow-2xl border-l border-white/5 flex flex-col p-6 md:p-10"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-bamm-yellow mb-2">Kampanya alanı</p>
+                  <h2 className="text-xl md:text-3xl font-black text-white uppercase tracking-tighter italic">
+                    {editingCampaign.id ? "Kampanyayı Düzenle" : "Yeni Kampanya"}
+                  </h2>
+                </div>
+                <button type="button" onClick={() => setEditingCampaign(null)} aria-label="Kampanya panelini kapat" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-colors border border-white/10">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto no-scrollbar space-y-5 pb-28 pr-1">
+                <div>
+                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Kampanya Başlığı</label>
+                  <input
+                    type="text"
+                    value={editingCampaign.title}
+                    onChange={(e) => setEditingCampaign({ ...editingCampaign, title: e.target.value })}
+                    placeholder="Örn: Hafta İçi Öğrenci İndirimi"
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:ring-1 focus:ring-bamm-yellow transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Açıklama</label>
+                  <textarea
+                    rows={4}
+                    value={editingCampaign.description}
+                    onChange={(e) => setEditingCampaign({ ...editingCampaign, description: e.target.value })}
+                    placeholder="Kampanya koşullarını kısa ve net yazın."
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white placeholder-gray-600 focus:ring-1 focus:ring-bamm-yellow transition-all resize-none"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2 pl-1">
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Kampanya Görseli</label>
+                    <div className="flex gap-1 bg-black/40 p-0.5 rounded-lg border border-white/5">
+                      <button type="button" onClick={() => setCampaignImageSourceTab("upload")} className={`px-3 py-1.5 text-[9px] font-bold rounded-md transition-all ${campaignImageSourceTab === "upload" ? "bg-bamm-yellow text-black font-black" : "text-gray-400 hover:text-white"}`}>Cihazdan</button>
+                      <button type="button" onClick={() => setCampaignImageSourceTab("url")} className={`px-3 py-1.5 text-[9px] font-bold rounded-md transition-all ${campaignImageSourceTab === "url" ? "bg-bamm-yellow text-black font-black" : "text-gray-400 hover:text-white"}`}>URL</button>
+                    </div>
+                  </div>
+
+                  {campaignImageSourceTab === "upload" ? (
+                    <label className="min-h-32 rounded-2xl border border-dashed border-white/15 bg-black/20 hover:bg-white/[0.03] transition-colors flex flex-col items-center justify-center gap-2 cursor-pointer overflow-hidden relative">
+                      {editingCampaign.image ? (
+                        <img src={editingCampaign.image} alt="Kampanya önizleme" className="absolute inset-0 w-full h-full object-cover opacity-45" referrerPolicy="no-referrer" />
+                      ) : null}
+                      <span className="relative z-10 w-11 h-11 rounded-2xl bg-bamm-yellow/15 text-bamm-yellow flex items-center justify-center"><Upload size={19} /></span>
+                      <span className="relative z-10 text-[10px] font-black uppercase tracking-widest text-white">{campaignImageUploadLoading ? "İşleniyor..." : "Görsel seç"}</span>
+                      <input type="file" accept="image/*" className="sr-only" onChange={(e) => handleCampaignImageUpload(e.target.files?.[0])} />
+                    </label>
+                  ) : (
+                    <div className="flex gap-3">
+                      <input
+                        type="url"
+                        value={editingCampaign.image?.startsWith("data:") ? "" : (editingCampaign.image || "")}
+                        onChange={(e) => setEditingCampaign({ ...editingCampaign, image: e.target.value })}
+                        placeholder="https://gorsel-linki.com/kampanya.jpg"
+                        className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white placeholder-gray-600 focus:ring-1 focus:ring-bamm-yellow transition-all"
+                      />
+                      {editingCampaign.image && !editingCampaign.image.startsWith("data:") && <img src={editingCampaign.image} alt="Önizleme" className="w-14 h-14 rounded-xl object-cover border border-white/10" referrerPolicy="no-referrer" />}
+                    </div>
+                  )}
+                  {campaignImageUploadError && <p className="mt-2 text-[11px] text-red-400 flex items-center gap-2"><AlertCircle size={14} /> {campaignImageUploadError}</p>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Etiket</label>
+                    <input type="text" value={editingCampaign.badge || ""} onChange={(e) => setEditingCampaign({ ...editingCampaign, badge: e.target.value })} placeholder="YENİ KAMPANYA" className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-xs text-white focus:ring-1 focus:ring-bamm-yellow" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block pl-1">Menü kategorisi</label>
+                    <select value={editingCampaign.category || "Kampanyalar"} onChange={(e) => setEditingCampaign({ ...editingCampaign, category: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-xs text-white appearance-none focus:ring-1 focus:ring-bamm-yellow">
+                      {availableCategories.map((category) => <option key={category} value={category} className="text-black">{category}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button type="button" onClick={() => setEditingCampaign({ ...editingCampaign, isNew: !editingCampaign.isNew })} aria-pressed={Boolean(editingCampaign.isNew)} className={`min-h-12 rounded-2xl border px-4 text-left transition-all ${editingCampaign.isNew ? "bg-bamm-yellow/10 border-bamm-yellow/30 text-bamm-yellow" : "bg-black/20 border-white/10 text-gray-500"}`}>
+                    <span className="block text-[9px] font-black uppercase tracking-widest">Yeni etiketi</span>
+                    <span className="text-[10px] mt-1 block">{editingCampaign.isNew ? "Gösteriliyor" : "Gizli"}</span>
+                  </button>
+                  <button type="button" onClick={() => setEditingCampaign({ ...editingCampaign, isActive: editingCampaign.isActive === false })} aria-pressed={editingCampaign.isActive !== false} className={`min-h-12 rounded-2xl border px-4 text-left transition-all ${editingCampaign.isActive !== false ? "bg-emerald-400/10 border-emerald-400/20 text-emerald-400" : "bg-black/20 border-white/10 text-gray-500"}`}>
+                    <span className="block text-[9px] font-black uppercase tracking-widest">Yayın durumu</span>
+                    <span className="text-[10px] mt-1 block">{editingCampaign.isActive !== false ? "Yayında" : "Gizli"}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="absolute bottom-5 left-6 right-6 md:left-10 md:right-10">
+                {campaignSaveError && <div className="mb-3 flex items-center gap-2 text-red-400 text-xs bg-red-400/10 py-3 px-4 rounded-xl border border-red-400/20"><AlertCircle size={14} /><span>{campaignSaveError}</span></div>}
+                <button type="button" onClick={saveCampaign} className="w-full bg-bamm-yellow text-black py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest active:scale-95 transition-all shadow-xl shadow-bamm-yellow/10">Kampanyayı Kaydet</button>
               </div>
             </motion.div>
           </div>

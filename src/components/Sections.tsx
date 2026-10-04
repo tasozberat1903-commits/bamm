@@ -54,7 +54,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { CATEGORIES, MENU_DATA, MenuItem, CAMPAIGNS, EVENTS, HEROSLIDES, HeroSlide, normalizeTurkish } from "../data";
+import { CATEGORIES, MENU_DATA, MenuItem, Campaign, CAMPAIGNS, EVENTS, HEROSLIDES, HeroSlide, normalizeTurkish } from "../data";
 import { db } from "../lib/firebase";
 import {
   collection,
@@ -578,6 +578,7 @@ export function HomeSection({
   const heroScrollRef = useRef<HTMLDivElement>(null);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
   const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string; image?: string }[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>(CAMPAIGNS.map((campaign, index) => ({ ...campaign, order: index * 10, isActive: true })));
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
@@ -626,6 +627,35 @@ export function HomeSection({
     };
   }, []);
 
+  useEffect(() => {
+    const fallbackCampaigns = CAMPAIGNS.map((campaign, index) => ({ ...campaign, order: index * 10, isActive: true }));
+    const sortCampaigns = (items: Campaign[]) => [...items]
+      .filter((campaign) => !campaign.deleted && campaign.isActive !== false)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = onSnapshot(collection(db, "campaigns"), (snap) => {
+        if (snap.empty) {
+          setCampaigns(sortCampaigns(fallbackCampaigns));
+          return;
+        }
+        const rows = snap.docs.map((campaignDoc) => ({
+          id: campaignDoc.id,
+          ...campaignDoc.data(),
+        })) as Campaign[];
+        setCampaigns(sortCampaigns(rows));
+      }, () => {
+        setCampaigns(sortCampaigns(fallbackCampaigns));
+      });
+    } catch (error) {
+      console.warn("HomeSection campaigns subscription error:", error);
+      setCampaigns(sortCampaigns(fallbackCampaigns));
+    }
+
+    return () => unsub?.();
+  }, []);
+
   const scrollHero = (direction: 'left' | 'right') => {
     if (heroScrollRef.current) {
       const container = heroScrollRef.current;
@@ -657,7 +687,7 @@ export function HomeSection({
       const firstChild = container.children[0] as HTMLElement;
       const itemWidth = firstChild.offsetWidth + 16; // 16 is the gap-4
       const index = Math.round(scrollLeft / itemWidth);
-      if (index !== activeCampaignIndex && index >= 0 && index < CAMPAIGNS.length) {
+      if (index !== activeCampaignIndex && index >= 0 && index < campaigns.length) {
         setActiveCampaignIndex(index);
       }
     }
@@ -825,7 +855,7 @@ export function HomeSection({
             onScroll={handleCampaignScroll}
             className="flex gap-4 overflow-x-auto no-scrollbar pb-8 -mx-6 px-6"
           >
-            {CAMPAIGNS.map((campaign, i) => (
+            {campaigns.map((campaign, i) => (
               <motion.div
                 key={campaign.id}
                 initial={{ opacity: 0, x: 20 }}
@@ -865,7 +895,7 @@ export function HomeSection({
 
           {/* Scroll Indicators (Dots) */}
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 pointer-events-none">
-            {CAMPAIGNS.map((_, i) => (
+            {campaigns.map((_, i) => (
               <div
                 key={i}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
