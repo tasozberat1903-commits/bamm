@@ -30,6 +30,7 @@ export default function App() {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isCampaignPopupOpen, setIsCampaignPopupOpen] = useState(true);
   const [campaignPopupEnabled, setCampaignPopupEnabled] = useState(true);
+  const [isStudentMode, setIsStudentMode] = useState(false);
   const [publicCampaigns, setPublicCampaigns] = useState<Campaign[]>(CAMPAIGNS.map((campaign, index) => ({ ...campaign, order: index * 10, isActive: true })));
   const campaignCloseRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -123,6 +124,12 @@ export default function App() {
     };
   }, [isCampaignPopupOpen, activeTab]);
 
+  useEffect(() => {
+    if (activeTab !== "menu") {
+      setIsStudentMode(false);
+    }
+  }, [activeTab]);
+
   const popupCampaign = publicCampaigns[0];
 
   const renderSection = () => {
@@ -143,6 +150,8 @@ export default function App() {
             onBackClick={() => setActiveTab("home")}
             initialCategory={menuInitialCategory}
             onFeedbackClick={() => setIsFeedbackOpen(true)}
+            isStudentMode={isStudentMode}
+            onStudentModeChange={setIsStudentMode}
           />
         );
       case "events":
@@ -283,6 +292,7 @@ export default function App() {
             <ProductDetail
               product={selectedProduct}
               onClose={() => setSelectedProduct(null)}
+              isStudentMode={isStudentMode}
             />
 
             <SearchModal

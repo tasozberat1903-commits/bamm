@@ -48,6 +48,33 @@ export interface HeroSlide {
   imageFit?: "cover" | "contain";
 }
 
+export const STUDENT_DISCOUNT_RATE = 0.3;
+
+export function isStudentDiscountAvailable(date = new Date()): boolean {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Istanbul",
+    weekday: "short",
+  }).format(date);
+
+  return weekday !== "Fri" && weekday !== "Sat";
+}
+
+export function getDiscountedPrice(
+  price: string,
+  discountRate = STUDENT_DISCOUNT_RATE,
+): string | null {
+  const normalized = price.replace(/\./g, "").replace(",", ".");
+  const match = normalized.match(/\d+(?:\.\d+)?/);
+  if (!match) return null;
+
+  const numericPrice = Number(match[0]);
+  if (!Number.isFinite(numericPrice)) return null;
+
+  const discountedPrice = Math.round(numericPrice * (1 - discountRate));
+  const suffix = price.includes("₺") ? "₺" : "TL";
+  return `${discountedPrice}${suffix}`;
+}
+
 export const CATEGORIES = [
   "Kampanyalar", "Yemekler", "Kadeh", "Şişeler", "Şarap", "Kokteyller", "Alkolsüz Kokteyller", "Biralar", "Shotlar", "Popüler", "Kahvaltı", "Kahveler", "Soğuk Kahveler", "Çaylar", "Atıştırmalıklar", "Salatalar", "Tatlılar", "Soğuk İçecekler", "Soft İçecekler"
 ];

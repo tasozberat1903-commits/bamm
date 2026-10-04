@@ -26,7 +26,6 @@ import {
   Beef,
   Drumstick,
   Egg,
-  Sparkles,
   ChevronLeft,
   MoreVertical,
   Minus,
@@ -54,7 +53,19 @@ import {
   AlertCircle,
 } from "lucide-react";
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { CATEGORIES, MENU_DATA, MenuItem, Campaign, CAMPAIGNS, EVENTS, HEROSLIDES, HeroSlide, normalizeTurkish } from "../data";
+import {
+  CATEGORIES,
+  MENU_DATA,
+  MenuItem,
+  Campaign,
+  CAMPAIGNS,
+  EVENTS,
+  HEROSLIDES,
+  HeroSlide,
+  normalizeTurkish,
+  getDiscountedPrice,
+  isStudentDiscountAvailable,
+} from "../data";
 import { db } from "../lib/firebase";
 import {
   collection,
@@ -1176,12 +1187,16 @@ export function MenuSection({
   onBackClick,
   initialCategory,
   onFeedbackClick,
+  isStudentMode,
+  onStudentModeChange,
 }: {
   onProductClick: (item: MenuItem) => void;
   onSearchClick: () => void;
   onBackClick?: () => void;
   initialCategory?: string;
   onFeedbackClick?: () => void;
+  isStudentMode: boolean;
+  onStudentModeChange: (isActive: boolean) => void;
 }) {
   const [selectedCategory, setSelectedCategory] = useState(
     initialCategory || CATEGORIES[0],
@@ -1191,6 +1206,18 @@ export function MenuSection({
   const [liveMenu, setLiveMenu] = useState<MenuItem[]>(MENU_DATA);
   const [dbCategories, setDbCategories] = useState<{ id: string; name: string; order: number; description?: string }[]>([]);
   const [isOffline, setIsOffline] = useState(false);
+  const studentDiscountAvailable = isStudentDiscountAvailable();
+
+  const getVisiblePrice = (item: MenuItem) => {
+    if (!isStudentMode || !studentDiscountAvailable) return item.price;
+    return getDiscountedPrice(item.price) || item.price;
+  };
+
+  useEffect(() => {
+    if (!studentDiscountAvailable && isStudentMode) {
+      onStudentModeChange(false);
+    }
+  }, [isStudentMode, onStudentModeChange, studentDiscountAvailable]);
 
   useEffect(() => {
     if (initialCategory) {
@@ -1604,7 +1631,7 @@ export function MenuSection({
         </div>
 
         {/* Selected Category Header below categories */}
-        <div className="px-6 py-4 flex items-center gap-4 border-b border-gray-100/80 mb-2">
+        <div className="px-6 py-4 flex flex-wrap items-center gap-3 border-b border-gray-100/80 mb-2">
           <div className="w-[52px] h-[52px] bg-[#FFF8D6] rounded-full flex items-center justify-center text-[#0F172A] shrink-0 overflow-hidden shadow-sm">
             {(() => {
               const dbCat = dbCategories.find(c => c.name === selectedCategory);
@@ -1622,7 +1649,7 @@ export function MenuSection({
               return <TitleIcon size={26} strokeWidth={2.5} />;
             })()}
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-[32px] sm:text-[36px] leading-tight font-black text-gray-900 tracking-tight">
               {selectedCategory === "Popüler" ? "Favoriler" : selectedCategory}
             </h1>
@@ -1630,7 +1657,64 @@ export function MenuSection({
               {getCatDescription(selectedCategory)}
             </p>
           </div>
+
+          <div className="w-full sm:ml-auto sm:w-auto">
+            <label
+              className={`ml-auto flex min-h-11 w-fit shrink-0 items-center justify-end gap-2 rounded-2xl border px-3 text-[10px] font-black uppercase tracking-wide transition-all sm:ml-0 sm:w-auto sm:px-3.5 ${
+              !studentDiscountAvailable
+                ? "cursor-not-allowed opacity-45"
+                : isStudentMode
+                  ? "cursor-pointer border-black bg-black text-bamm-yellow shadow-[0_8px_20px_rgba(0,0,0,0.18)]"
+                  : "cursor-pointer border-bamm-yellow bg-gradient-to-br from-[#FFE45C] via-bamm-yellow to-[#FFC400] text-gray-950 shadow-[0_8px_22px_rgba(255,196,0,0.36)] hover:shadow-[0_10px_26px_rgba(255,196,0,0.5)]"
+              }`}
+              title={
+                studentDiscountAvailable
+                  ? "Öğrenci fiyatlarını göster"
+                  : "Cuma ve cumartesi günleri geçerli değil"
+              }
+            >
+              <input
+                id="student-discount-toggle"
+                type="checkbox"
+                checked={isStudentMode}
+                disabled={!studentDiscountAvailable}
+                onChange={(event) => onStudentModeChange(event.target.checked)}
+                aria-label={
+                  studentDiscountAvailable
+                    ? "Öğrenci indirimi gösterimini aç veya kapat"
+                    : "Öğrenci indirimi cuma ve cumartesi günleri geçerli değil"
+                }
+                className="peer sr-only"
+              />
+              <span className="relative flex flex-col items-start leading-none">
+                <span className="text-[9px] tracking-[0.16em] opacity-70">ÖĞRENCİLER İÇİN</span>
+                <span className="mt-1 text-[12px] tracking-[0.08em]">
+                  {isStudentMode ? "AÇIK" : "%30 İNDİRİM"}
+                </span>
+              </span>
+              <span
+                aria-hidden="true"
+                className={`relative ml-1 flex h-[30px] w-[50px] shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-black peer-focus-visible:ring-offset-2 ${
+                  isStudentMode ? "bg-bamm-yellow" : "bg-black/35"
+                }`}
+              >
+                <span
+                  className={`h-5 w-5 rounded-full border-[5px] border-white bg-transparent shadow-[5px_2px_7px_rgba(8,8,8,0.26)] transition-transform duration-200 ${
+                    isStudentMode ? "translate-x-5 bg-white" : "translate-x-0"
+                  }`}
+                />
+              </span>
+            </label>
+          </div>
         </div>
+
+        {!studentDiscountAvailable && (
+          <p className={`px-6 pb-3 text-[10px] font-semibold ${
+            "text-gray-400"
+          }`}>
+            Öğrenci indirimi cuma ve cumartesi günleri geçerli değil.
+          </p>
+        )}
 
         {categorySubcategories.length > 0 && (
           <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-6 pb-6 shrink-0 -mt-2">
@@ -1750,7 +1834,7 @@ export function MenuSection({
                             <div className="flex flex-col items-end gap-3 pl-2 relative z-10 flex-shrink-0">
                               <div className="flex items-baseline gap-0.5">
                                 <span className={`text-[22px] font-black tracking-tighter ${item.isSoldOut ? "text-gray-400" : "text-gray-900"}`}>
-                                  {item.price.replace(/ TL|₺/g, "")}
+                                  {getVisiblePrice(item).replace(/\s*(?:TL|₺)\s*$/i, "")}
                                 </span>
                                 <span className="text-[10px] font-bold text-gray-400">
                                   TL
@@ -1837,7 +1921,7 @@ export function MenuSection({
                     <div className="flex flex-col items-end gap-3 pl-2 relative z-10 flex-shrink-0">
                       <div className="flex items-baseline gap-0.5">
                         <span className={`text-[22px] font-black tracking-tighter ${item.isSoldOut ? "text-gray-400" : "text-gray-900"}`}>
-                          {item.price.replace(/ TL|₺/g, "")}
+                          {getVisiblePrice(item).replace(/\s*(?:TL|₺)\s*$/i, "")}
                         </span>
                         <span className="text-[10px] font-bold text-gray-400">
                           TL
@@ -2298,11 +2382,17 @@ export function ContactSection({
 export function ProductDetail({
   product,
   onClose,
+  isStudentMode = false,
 }: {
   product: MenuItem | null;
   onClose: () => void;
+  isStudentMode?: boolean;
 }) {
   if (!product) return null;
+
+  const visiblePrice = isStudentMode
+    ? getDiscountedPrice(product.price) || product.price
+    : product.price;
 
   return (
     <AnimatePresence>
@@ -2415,8 +2505,15 @@ export function ProductDetail({
                   )}
                 </div>
               </div>
-              <div className={`text-2xl font-black ${product.isSoldOut ? "text-gray-400" : "text-[#AD1519]"}`}>
-                {product.price}
+              <div className="flex flex-col items-end">
+                {isStudentMode && !product.isSoldOut && (
+                  <span className="text-xs font-bold text-gray-400 line-through">
+                    {product.price}
+                  </span>
+                )}
+                <div className={`text-2xl font-black ${product.isSoldOut ? "text-gray-400" : "text-[#AD1519]"}`}>
+                  {visiblePrice}
+                </div>
               </div>
             </div>
 
