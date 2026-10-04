@@ -157,8 +157,6 @@ export interface FeedbackItem {
 
 export function AdminPanel() {
   const [user, setUser] = useState<User | null>(null);
-  const [isLocalPreview, setIsLocalPreview] = useState(false);
-  const hasAdminAccess = Boolean(user) || isLocalPreview;
   const [products, setProducts] = useState<MenuItem[]>(MENU_DATA);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<MenuItem>>({});
@@ -237,7 +235,7 @@ export function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    if (!hasAdminAccess) return;
+    if (!user) return;
     let unsub: (() => void) | undefined;
     try {
       unsub = onSnapshot(collection(db, "products"), (snap) => {
@@ -293,10 +291,10 @@ export function AdminPanel() {
         }
       }
     };
-  }, [user, isLocalPreview]);
+  }, [user]);
 
   useEffect(() => {
-    if (!hasAdminAccess) return;
+    if (!user) return;
     let unsubCampaigns: (() => void) | undefined;
     let unsubSettings: (() => void) | undefined;
     let isSeedingCampaigns = false;
@@ -319,16 +317,12 @@ export function AdminPanel() {
         } else if (!isSeedingCampaigns) {
           isSeedingCampaigns = true;
           setCampaigns(defaults);
-          if (user) {
-            Promise.all(defaults.map((campaign) =>
-              setDoc(doc(db, "campaigns", campaign.id), campaign, { merge: true })
-            )).then(() => setCampaignsLoadedFromDb(true)).catch((error) => {
-              console.warn("Varsayılan kampanyalar yüklenemedi:", error);
-              setCampaignsLoadedFromDb(true);
-            });
-          } else {
+          Promise.all(defaults.map((campaign) =>
+            setDoc(doc(db, "campaigns", campaign.id), campaign, { merge: true })
+          )).then(() => setCampaignsLoadedFromDb(true)).catch((error) => {
+            console.warn("Varsayılan kampanyalar yüklenemedi:", error);
             setCampaignsLoadedFromDb(true);
-          }
+          });
         }
       }, (error) => {
         handleFirestoreError(error, OperationType.GET, "campaigns", false);
@@ -351,10 +345,10 @@ export function AdminPanel() {
       unsubCampaigns?.();
       unsubSettings?.();
     };
-  }, [user, isLocalPreview]);
+  }, [user]);
 
   useEffect(() => {
-    if (!hasAdminAccess) return;
+    if (!user) return;
     let unsub: (() => void) | undefined;
     try {
       unsub = onSnapshot(collection(db, "categories"), (snap) => {
@@ -390,7 +384,7 @@ export function AdminPanel() {
         }
       }
     };
-  }, [user, isLocalPreview]);
+  }, [user]);
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -516,7 +510,6 @@ export function AdminPanel() {
   };
 
   const handleLogout = async () => {
-    setIsLocalPreview(false);
     await signOut(auth);
   };
 
@@ -992,10 +985,6 @@ export function AdminPanel() {
 
   const saveCampaign = async () => {
     if (!editingCampaign) return;
-    if (isLocalPreview) {
-      setCampaignSaveError("Yerel önizleme salt okunurdur. Kampanya kaydetmek için admin hesabıyla giriş yapın.");
-      return;
-    }
     if (!editingCampaign.title.trim()) {
       setCampaignSaveError("Kampanya başlığı zorunludur.");
       return;
@@ -1027,7 +1016,6 @@ export function AdminPanel() {
   };
 
   const moveCampaign = async (index: number, direction: "up" | "down") => {
-    if (isLocalPreview) return;
     const ordered = sortCampaigns(campaigns);
     const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= ordered.length) return;
@@ -1049,7 +1037,6 @@ export function AdminPanel() {
   };
 
   const toggleCampaignActive = async (campaign: Campaign) => {
-    if (isLocalPreview) return;
     const isActive = campaign.isActive === false;
     setCampaigns((current) => current.map((item) => item.id === campaign.id ? { ...item, isActive } : item));
     try {
@@ -1060,7 +1047,6 @@ export function AdminPanel() {
   };
 
   const deleteCampaign = async (campaign: Campaign) => {
-    if (isLocalPreview) return;
     setCampaigns((current) => current.filter((item) => item.id !== campaign.id));
     try {
       await setDoc(doc(db, "campaigns", campaign.id), { deleted: true, isActive: false, updatedAt: serverTimestamp() }, { merge: true });
@@ -1070,7 +1056,6 @@ export function AdminPanel() {
   };
 
   const toggleCampaignPopup = async () => {
-    if (isLocalPreview) return;
     const nextValue = !campaignPopupEnabled;
     setCampaignPopupEnabled(nextValue);
     try {
@@ -1119,7 +1104,7 @@ export function AdminPanel() {
     }
   };
 
-  if (!hasAdminAccess) {
+  if (!user) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-[#0F1115] px-6 text-white text-center">
         <motion.div 
@@ -1173,23 +1158,6 @@ export function AdminPanel() {
             </button>
           </form>
 
-          {import.meta.env.DEV && (
-            <div className="mt-6 border-t border-white/10 pt-5">
-              <p className="text-[11px] leading-relaxed text-gray-500 mb-3">
-                Şifreni kullanmadan panel arayüzünü incelemek için local önizlemeyi açabilirsin.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginError("");
-                  setIsLocalPreview(true);
-                }}
-                className="w-full min-h-11 px-4 py-3 rounded-2xl border border-bamm-yellow/50 text-bamm-yellow font-black uppercase tracking-widest text-[11px] hover:bg-bamm-yellow/10 active:scale-95 transition-all"
-              >
-                Yerel Önizleme ile Devam Et
-              </button>
-            </div>
-          )}
         </motion.div>
       </div>
     );
@@ -1235,11 +1203,6 @@ export function AdminPanel() {
 
   return (
     <div className="flex-1 bg-[#0F1115] text-white flex flex-col md:flex-row h-full overflow-hidden relative">
-      {isLocalPreview && (
-        <div className="absolute top-0 left-0 right-0 z-[60] border-b border-bamm-yellow/30 bg-bamm-yellow/10 px-4 py-3 text-center text-xs font-bold text-bamm-yellow">
-          Yerel önizleme modu: Paneli inceleyebilirsin; kaydetme işlemleri için gerçek admin hesabıyla giriş yapman gerekir.
-        </div>
-      )}
       {/* Sidebar Navigation - Desktop */}
       <div className="hidden md:flex w-64 bg-[#16191E] border-r border-white/5 flex-col pt-12 pb-8 shrink-0">
         <div className="px-6 mb-12">
